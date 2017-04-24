@@ -33,4 +33,22 @@ fun aux_basic_block :: "inst list \<Rightarrow> int \<Rightarrow> int \<Rightarr
 abbreviation build_basic_blocks :: "inst list \<Rightarrow> vertices" where
 "build_basic_blocks prog == aux_basic_block prog 0 0 []"
 
+(* Verification *)
+
+(* Check that we can rebuild the initial list of instructions from basic blocks *)
+fun reconstruct_bytecode :: "vertices \<Rightarrow> inst list" where
+ "reconstruct_bytecode [] = []"
+| "reconstruct_bytecode ((n,Jump,b)#q) = b@[Pc JUMP] @ (reconstruct_bytecode q)" 
+| "reconstruct_bytecode ((n,Jumpi,b)#q) = b@[Pc JUMPI] @ (reconstruct_bytecode q)" 
+| "reconstruct_bytecode ((n,_,b)#q) = b @ (reconstruct_bytecode q)" 
+
+lemma rev_basic_blocks: "reconstruct_bytecode (aux_basic_block i p bp b) = (rev b)@i"
+apply(induction i arbitrary: p bp b)
+apply(auto simp: Let_def split: inst.split misc_inst.split pc_inst.split)
+done
+
+theorem reverse_basic_blocks: "reconstruct_bytecode (build_basic_blocks i) = i"
+apply(simp add: rev_basic_blocks)
+done
+
 end
