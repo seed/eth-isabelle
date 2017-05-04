@@ -7,8 +7,8 @@ begin
 datatype tblock =
 Next | Jump | Jumpi | No
 
-type_synonym vertice = "int * tblock * inst list"
-type_synonym vertices = "vertice list"
+type_synonym vertex = "int * tblock * inst list"
+type_synonym vertices = "vertex list"
 type_synonym edge = "int * (int option)"
 type_synonym edges = "int \<Rightarrow> edge option"
 
@@ -20,6 +20,7 @@ NEXT | GOTO "int" | GOTOIF "int" | UNDEFINED "char list" | NONE
 
 datatype edges_return = 
 Complete "edges" | Incomplete "edges * char list * stack_value list"
+
 
 (* Auxiliary functions *)
 
@@ -33,9 +34,10 @@ abbreviation thrd :: "'a * 'b * 'c \<Rightarrow> 'c" where
 "thrd v == snd (snd v)"
 
 fun next_i :: "vertices \<Rightarrow> int \<Rightarrow> int" where
-  "next_i (i#j#l) n = (if fst i=n then fst j else next_i (j#l) n)"
+ "next_i v n = fst (hd (dropWhile (\<lambda>u. (fst u)\<le>n) v))"
+(*  "next_i (i#j#l) n = (if fst i=n then fst j else next_i (j#l) n)"*)
 
-definition find_block :: "int \<Rightarrow> vertice \<Rightarrow> bool" where
+definition find_block :: "int \<Rightarrow> vertex \<Rightarrow> bool" where
 "find_block n bl = (if n=fst bl then True else False)"
 
 fun good_dest :: "int \<Rightarrow> vertices \<Rightarrow> bool" where
@@ -64,6 +66,16 @@ definition concat_map :: "int \<Rightarrow> edge \<Rightarrow> edges_return \<Ri
 fun extract_indexes :: "vertices \<Rightarrow> int list" where
   "extract_indexes [] = []"
 | "extract_indexes ((i,b)#a) = i # (extract_indexes a)"
+
+definition deconstruct :: "edges_return \<Rightarrow> edges" where
+"deconstruct e = (case e of (Complete i) \<Rightarrow> i | (Incomplete (i,d,s)) \<Rightarrow> i)"
+
+fun print_edges_aux ::"int list \<Rightarrow> edges \<Rightarrow> (int * edge) list" where
+"print_edges_aux [] e = []"
+| "print_edges_aux (n#q) e = (case e n of None \<Rightarrow> print_edges_aux q e | Some i \<Rightarrow> (n,i) # (print_edges_aux q e))"
+
+abbreviation print_edges :: "vertices \<Rightarrow> edges_return \<Rightarrow> (int * edge) list" where
+"print_edges v e == print_edges_aux (extract_indexes v) (deconstruct e)"
 
 (* Stack manipulations *)
 
@@ -103,7 +115,6 @@ fun aux_basic_block :: "inst list \<Rightarrow> int \<Rightarrow> int \<Rightarr
 
 abbreviation build_basic_blocks :: "inst list \<Rightarrow> vertices" where
 "build_basic_blocks prog == aux_basic_block prog 0 0 []"
-
 
 (* Read a block *)
 fun edge_one_block :: "tblock \<Rightarrow> inst list \<Rightarrow> stack_value list \<Rightarrow> (edge_return * stack_value list)" where
