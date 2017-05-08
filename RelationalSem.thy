@@ -43,7 +43,7 @@ When a transaction finishes, if our contract is marked as killed, it is destroye
 The following relation captures these possibilities.
 *}
 
-inductive account_state_natural_change :: "account_state \<Rightarrow> account_state \<Rightarrow> bool"
+inductive account_state_natural_change :: "int account_state \<Rightarrow> int account_state \<Rightarrow> bool"
 where
 natural: -- {* The balance of this account might increase
 whenever the code in our contract is not executing.  Some other account might
@@ -86,7 +86,7 @@ The whole argument can be seen as a mathematical induction over depths of reentr
 this idea has not been formalized yet. *}
 
 inductive account_state_return_change ::
-"(account_state \<Rightarrow> bool) \<Rightarrow> account_state \<Rightarrow> account_state \<Rightarrow> bool"
+"(int account_state \<Rightarrow> bool) \<Rightarrow> int account_state \<Rightarrow> int account_state \<Rightarrow> bool"
 where
 account_return:
 "invariant
@@ -120,7 +120,7 @@ declare account_state_return_change.simps [simp]
 
 text "Next we specify which program results might see a return."
 
-fun returnable_result :: "instruction_result \<Rightarrow> bool"
+fun returnable_result :: "int instruction_result \<Rightarrow> bool"
 where
   "returnable_result (InstructionContinue _) = False"
 | "returnable_result (InstructionToEnvironment (ContractCall _) _ _) = True"
@@ -133,7 +133,7 @@ where
 | "returnable_result (InstructionToEnvironment (ContractReturn _) _ _) = False"
 | "returnable_result InstructionAnnotationFailure = False"
 
-fun returnable_from_delegate_call :: "instruction_result \<Rightarrow> bool"
+fun returnable_from_delegate_call :: "int instruction_result \<Rightarrow> bool"
 where
   "returnable_from_delegate_call (InstructionContinue _) = False"
 | "returnable_from_delegate_call (InstructionToEnvironment (ContractCall _) _ _) = False"
@@ -151,16 +151,16 @@ subsection {* A Round of the Game *}
 text {* Now we are ready to specify the environment's turn. *}
 
 datatype environment_input =
-    Execution "instruction_result"
+    Execution "int instruction_result"
   | Init "call_env"
 
 
 inductive environment_turn ::
-"(account_state \<Rightarrow> bool) (* The invariant of our contract*)
-\<Rightarrow> (account_state * environment_input)
+"(int account_state \<Rightarrow> bool) (* The invariant of our contract*)
+\<Rightarrow> (int account_state * environment_input)
    (* the account state before the environment's move
       and the last thing our account did *)
-\<Rightarrow> (account_state * variable_ctx)
+\<Rightarrow> (int account_state * int variable_ctx)
    (* the account state after the environment's move
       and the variable environment from which our contract must start. *)
 \<Rightarrow> bool (* a boolean indicating if that is a possible environment's move. *)"
@@ -218,7 +218,7 @@ where
 text {* As a reply, our contract might make a move, or report an annotation failure.*}
 
 inductive contract_turn ::
-"(account_state * variable_ctx) \<Rightarrow> (account_state * environment_input) \<Rightarrow> bool"
+"(int account_state * int variable_ctx) \<Rightarrow> (int account_state * environment_input) \<Rightarrow> bool"
 where
   contract_to_environment:
   "(* Under a constant environment built from the old account state, *)
@@ -251,9 +251,9 @@ The round is a binary relation over a single set.
 *}
 
 inductive one_round ::
-"(account_state \<Rightarrow> bool) \<Rightarrow> 
-(account_state * environment_input) \<Rightarrow> 
-(account_state * environment_input) \<Rightarrow> bool"
+"(int account_state \<Rightarrow> bool) \<Rightarrow> 
+(int account_state * environment_input) \<Rightarrow> 
+(int account_state * environment_input) \<Rightarrow> bool"
 where
 round:
 "environment_turn I a b \<Longrightarrow> contract_turn b c \<Longrightarrow> one_round I a c"
@@ -334,7 +334,7 @@ This doubles the already massive number of subgoals.
 *}
 
 definition no_assertion_failure_post ::
-  "(account_state \<Rightarrow> bool) \<Rightarrow> (account_state \<times> environment_input) \<Rightarrow> bool"
+  "(int account_state \<Rightarrow> bool) \<Rightarrow> (int account_state \<times> environment_input) \<Rightarrow> bool"
 where
 "no_assertion_failure_post I fin =
  (I (fst fin) \<and> (* The invariant holds. *)
@@ -373,9 +373,9 @@ reentrancy in Why ML.
 I have not justified the idea in Isabelle/HOL.
 *}
 
-definition no_assertion_failure :: "(account_state \<Rightarrow> bool) \<Rightarrow> bool"
+definition no_assertion_failure :: "(int account_state \<Rightarrow> bool) \<Rightarrow> bool"
 where
-"no_assertion_failure (I :: account_state \<Rightarrow> bool) \<equiv>
+"no_assertion_failure (I :: int account_state \<Rightarrow> bool) \<equiv>
   (\<forall> addr str code bal ongoing killed callenv.
     I \<lparr> account_address = addr, account_storage = str, account_code = code,
        account_balance = bal,
@@ -444,14 +444,14 @@ All these requirements are captured by the transitive closure of @{term one_roun
 *}
 
 definition pre_post_conditions ::
-"(account_state \<Rightarrow> bool) \<Rightarrow> (account_state \<Rightarrow> call_env \<Rightarrow> bool) \<Rightarrow>
- (account_state \<Rightarrow> call_env \<Rightarrow> (account_state \<times> environment_input) \<Rightarrow> bool) \<Rightarrow> bool"
+"(int account_state \<Rightarrow> bool) \<Rightarrow> (int account_state \<Rightarrow> call_env \<Rightarrow> bool) \<Rightarrow>
+ (int account_state \<Rightarrow> call_env \<Rightarrow> (int account_state \<times> environment_input) \<Rightarrow> bool) \<Rightarrow> bool"
 where
 "pre_post_conditions
-  (I :: account_state \<Rightarrow> bool)
-  (precondition :: account_state \<Rightarrow> call_env\<Rightarrow> bool)
-  (postcondition :: account_state \<Rightarrow> call_env \<Rightarrow>
-                    (account_state \<times> environment_input) \<Rightarrow> bool) \<equiv>
+  (I :: int account_state \<Rightarrow> bool)
+  (precondition :: int account_state \<Rightarrow> call_env\<Rightarrow> bool)
+  (postcondition :: int account_state \<Rightarrow> call_env \<Rightarrow>
+                    (int account_state \<times> environment_input) \<Rightarrow> bool) \<equiv>
                     
   (* for any initial call and initial account state that satisfy *)
   (* the invariant and the precondition, *)

@@ -19,7 +19,7 @@ done
 
 (* Following Magnus Myreen's thesis "Formal verification of machine-code programs" 3.2.4 *)  
 
-datatype state_element =
+datatype 'a state_element =
     StackHeightElm "nat"  (* considering making it int *)
   | StackElm "nat * w256" (* position, value *)
     (* The position is counted from the bottom *)
@@ -29,10 +29,10 @@ datatype state_element =
   | LogElm "nat * log_entry" (* position, log *)
     (* Log (0, entry) says that the first recorded log entry is 0 *)
   | LogNumElm "nat" (* Number of recorded logs *)
-  | PcElm "int" (* program counter *)
+  | PcElm "'a" (* program counter *)
   | GasElm "int" (* remaining gas *)
   | MemoryUsageElm "int" (* current memory usage *)
-  | CodeElm "int * inst" (* a position containing an instruction *)
+  | CodeElm "'a * inst" (* a position containing an instruction *)
   | ThisAccountElm "address" (* The address of this account *)
   | BalanceElm "address * w256" (* address, amount *)
   | CallerElm "address"
@@ -41,7 +41,7 @@ datatype state_element =
   | SentDataLengthElm "nat" (* considering making it int *)
   | SentDataElm "nat * byte" (* position, content.  Considering making position an int *)
   | ExtProgramSizeElm "address * int" (* address, size.  Considering making size an int *)
-  | ExtProgramElm "address * nat * byte" (* address, position, byte.  Considering making position an int *)
+  | ExtProgramElm "address * 'a * byte" (* address, position, byte.  Considering making position an int *)
   | ContractActionElm "contract_action" (* None indicates continued execution *)
   | ContinuingElm "bool" (* True if the execution is still continuing *)
   | BlockhashElm "w256 * w256"
@@ -52,66 +52,66 @@ datatype state_element =
   | GaslimitElm "w256"
   | GaspriceElm "w256"
 
-abbreviation blockhash_as_elm :: "(w256 \<Rightarrow> w256) \<Rightarrow> state_element set"
+abbreviation blockhash_as_elm :: "(w256 \<Rightarrow> w256) \<Rightarrow> 'a state_element set"
 where "blockhash_as_elm f == { BlockhashElm (n, h) | n h. f n = h}"
 
-abbreviation block_info_as_set :: "block_info \<Rightarrow> state_element set"
+abbreviation block_info_as_set :: "block_info \<Rightarrow> 'a state_element set"
 where "block_info_as_set b ==
   blockhash_as_elm (block_blockhash b) \<union> { CoinbaseElm (block_coinbase b),
   TimestampElm (block_timestamp b), DifficultyElm (block_difficulty b),
   GaslimitElm (block_gaslimit b), GaspriceElm (block_gasprice b), BlockNumberElm (block_number b) }"
 
-definition contract_action_as_set :: "contract_action \<Rightarrow> state_element set"
+definition contract_action_as_set :: "contract_action \<Rightarrow> 'a state_element set"
   where "contract_action_as_set act == { ContractActionElm act }"
 
-definition memory_as_set :: "memory \<Rightarrow> state_element set"
+definition memory_as_set :: "memory \<Rightarrow> 'a state_element set"
   where
     "memory_as_set m == { MemoryElm (a, v) | a v. m a = v }"
 
-definition storage_as_set :: "storage \<Rightarrow> state_element set"
+definition storage_as_set :: "storage \<Rightarrow> 'a state_element set"
   where
     "storage_as_set s == { StorageElm (i, v) | i v. s i = v}"
 
-definition balance_as_set :: "(address \<Rightarrow> w256) \<Rightarrow> state_element set"
+definition balance_as_set :: "(address \<Rightarrow> w256) \<Rightarrow> 'a state_element set"
   where
     "balance_as_set b == { BalanceElm (a, v) | a v. b a = v }"
 
-definition stack_as_set :: "w256 list \<Rightarrow> state_element set"
+definition stack_as_set :: "w256 list \<Rightarrow> 'a state_element set"
   where
     "stack_as_set s == { StackHeightElm (length s) } \<union>
                        { StackElm (idx, v) | idx v. idx < length s \<and> (rev s) ! idx = v }"
 
-definition data_sent_as_set :: "byte list \<Rightarrow> state_element set"
+definition data_sent_as_set :: "byte list \<Rightarrow> 'a state_element set"
   where
     "data_sent_as_set lst == { SentDataLengthElm (length lst) } \<union>
                              { SentDataElm (idx, v) | idx v. idx < length lst \<and> lst ! idx = v }"
 
-definition ext_program_as_set :: "(address \<Rightarrow> program) \<Rightarrow> state_element set"
+definition ext_program_as_set :: "(address \<Rightarrow> 'a program) \<Rightarrow> 'a state_element set"
   where
     "ext_program_as_set ext ==
       { ExtProgramSizeElm (adr, s) | adr s. program_length (ext adr) = s } \<union>
       { ExtProgramElm (adr, pos, b) | adr pos b. program_as_natural_map (ext adr) pos = b }
     "
 
-definition log_as_set :: "log_entry list \<Rightarrow> state_element set"
+definition log_as_set :: "log_entry list \<Rightarrow> 'a state_element set"
   where
     "log_as_set logs ==
       { LogNumElm (length logs) } \<union>
       { LogElm (pos, l) | pos l. (rev logs) ! pos = l \<and> pos < length logs}
     "
 
-definition program_as_set :: "program \<Rightarrow> state_element set"
+definition program_as_set :: "'a program \<Rightarrow> 'a state_element set"
   where
     "program_as_set prg ==
       { CodeElm (pos, i) | pos i. program_content prg pos = Some i  } \<union>
       { CodeElm (pos, Misc STOP) | pos. program_content prg pos = None }
     "
 
-definition constant_ctx_as_set :: "constant_ctx \<Rightarrow> state_element set"
+definition constant_ctx_as_set :: "'a constant_ctx \<Rightarrow> 'a state_element set"
   where
     "constant_ctx_as_set c == program_as_set (cctx_program c) \<union> { ThisAccountElm (cctx_this c) }"
 
-definition variable_ctx_as_set :: "variable_ctx \<Rightarrow> state_element set"
+definition variable_ctx_as_set :: "'a variable_ctx \<Rightarrow> 'a state_element set"
   where
     "variable_ctx_as_set v ==
        stack_as_set (vctx_stack v)
@@ -131,15 +131,15 @@ definition variable_ctx_as_set :: "variable_ctx \<Rightarrow> state_element set"
       , SentDataLengthElm (length (vctx_data_sent v))
       }"
 
-definition contexts_as_set :: "variable_ctx \<Rightarrow> constant_ctx \<Rightarrow> state_element set"
+definition contexts_as_set :: "'a variable_ctx \<Rightarrow> 'a constant_ctx \<Rightarrow> 'a state_element set"
   where
     "contexts_as_set v c ==
        constant_ctx_as_set c \<union> variable_ctx_as_set v"
 
-type_synonym 'a set_pred = "'a set \<Rightarrow> bool"
+type_synonym 'b set_pred = "'b set \<Rightarrow> bool"
 
 (* From Magnus Myreen's thesis, Section 3.3 *)
-definition sep :: "'a set_pred \<Rightarrow> 'a set_pred \<Rightarrow> 'a set_pred"
+definition sep :: "'b set_pred \<Rightarrow> 'b set_pred \<Rightarrow> 'b set_pred"
   where
     "sep p q == (\<lambda> s. \<exists> u v. p u \<and> q v \<and> u \<union> v = s \<and> u \<inter> v = {})"
 
@@ -180,27 +180,27 @@ definition pure :: "bool \<Rightarrow> 'a set_pred"
 
 notation pure ("\<langle> _ \<rangle>")
 
-definition memory_usage :: "int \<Rightarrow> state_element set \<Rightarrow> bool"
+definition memory_usage :: "int \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "memory_usage u s == (s = {MemoryUsageElm u})"
   
-definition stack_height :: "nat \<Rightarrow> state_element set \<Rightarrow> bool"
+definition stack_height :: "nat \<Rightarrow> 'a state_element set \<Rightarrow> bool"
   where
     "stack_height h s == (s = {StackHeightElm h})"
 
-definition stack :: "nat \<Rightarrow> w256 \<Rightarrow> state_element set \<Rightarrow> bool"
+definition stack :: "nat \<Rightarrow> w256 \<Rightarrow> 'a state_element set \<Rightarrow> bool"
   where
     "stack pos v s == (s = {StackElm (pos, v)})"
 
-definition program_counter :: "int \<Rightarrow> state_element set \<Rightarrow> bool"
+definition program_counter :: "'a \<Rightarrow> 'a state_element set \<Rightarrow> bool"
   where
     "program_counter pos s == s = {PcElm pos}"
 
-definition log_number :: "nat \<Rightarrow> state_element set \<Rightarrow> bool"
+definition log_number :: "nat \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "log_number n s == s = {LogNumElm n}"
 
-definition logged :: "nat \<Rightarrow> log_entry \<Rightarrow> state_element set \<Rightarrow> bool"
+definition logged :: "nat \<Rightarrow> log_entry \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "logged n l s == s = {LogElm (n, l)}"
 
@@ -210,11 +210,11 @@ lemma sep_logged [simp]:
 apply(auto simp add: sep_def logged_def)
 done
 
-definition gas_pred :: "int \<Rightarrow> state_element set \<Rightarrow> bool"
+definition gas_pred :: "int \<Rightarrow> 'a state_element set \<Rightarrow> bool"
   where
     "gas_pred g s == s = {GasElm g}"
 
-definition gas_any :: "state_element set \<Rightarrow> bool"
+definition gas_any :: "'a state_element set \<Rightarrow> bool"
   where
     "gas_any s == (\<exists> g. s = {GasElm g})"
 
@@ -237,42 +237,42 @@ apply(auto simp add: log_number_def sep_def)
 done
 
 
-definition caller :: "address \<Rightarrow> state_element set \<Rightarrow> bool"
+definition caller :: "address \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "caller c s == s = {CallerElm c}"
 
-definition storage :: "w256 \<Rightarrow> w256 \<Rightarrow> state_element set \<Rightarrow> bool"
+definition storage :: "w256 \<Rightarrow> w256 \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "storage idx w s == s = {StorageElm (idx, w)}"
 
 
-definition this_account :: "address \<Rightarrow> state_element set \<Rightarrow> bool"
+definition this_account :: "address \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "this_account t s == s = {ThisAccountElm t}"
 
-definition balance :: "address \<Rightarrow> w256 \<Rightarrow> state_element set \<Rightarrow> bool"
+definition balance :: "address \<Rightarrow> w256 \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "balance adr v s == s = {BalanceElm (adr, v)}"
 
-definition block_number_pred :: "w256 \<Rightarrow> state_element set \<Rightarrow> bool"
+definition block_number_pred :: "w256 \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "block_number_pred w s == s = {BlockNumberElm w}"
 
-definition continuing :: "state_element set \<Rightarrow> bool"
+definition continuing :: "'a state_element set \<Rightarrow> bool"
 where
 "continuing s == s = { ContinuingElm True }"
 
-definition not_continuing :: "state_element set \<Rightarrow> bool"
+definition not_continuing :: "'a state_element set \<Rightarrow> bool"
 where
 "not_continuing s == s = {ContinuingElm False}"
 
-definition action :: "contract_action \<Rightarrow> state_element set \<Rightarrow> bool"
+definition action :: "contract_action \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "action act s == s = {ContractActionElm act}"
 
 (* memory8, memory, calldata, and storage should be added here *)
 
-definition memory8 :: "w256 \<Rightarrow> byte \<Rightarrow> state_element set \<Rightarrow> bool"
+definition memory8 :: "w256 \<Rightarrow> byte \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "memory8 idx v s == s = {MemoryElm (idx ,v)}"
 
@@ -293,12 +293,12 @@ proof -
 qed
 
 
-fun memory_range :: "w256 \<Rightarrow> byte list \<Rightarrow> state_element set \<Rightarrow> bool"
+fun memory_range :: "w256 \<Rightarrow> byte list \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
   "memory_range begin [] = emp"
 | "memory_range begin (h # t) = memory8 begin h ** memory_range (begin + 1) t"
 
-fun memory_range_elms :: "w256 \<Rightarrow> byte list \<Rightarrow> state_element set"
+fun memory_range_elms :: "w256 \<Rightarrow> byte list \<Rightarrow> 'a state_element set"
 where
   "memory_range_elms begin [] = {}"
 | "memory_range_elms begin (a # lst) = {MemoryElm (begin, a)} \<union> memory_range_elms (begin + 1) lst"
@@ -335,7 +335,7 @@ lemma stack_sem :
   apply(simp)
   done
 
-definition instruction_result_as_set :: "constant_ctx \<Rightarrow> instruction_result \<Rightarrow> state_element set"
+definition instruction_result_as_set :: "'a constant_ctx \<Rightarrow> 'a instruction_result \<Rightarrow> 'a state_element set"
   where
     "instruction_result_as_set c rslt =
         ( case rslt of
@@ -349,7 +349,7 @@ lemma annotation_failure_as_set [simp] :
 apply(simp add: instruction_result_as_set_def)
 done
 
-definition code :: "(int * inst) set \<Rightarrow> state_element set \<Rightarrow> bool"
+definition code :: "('a * inst) set \<Rightarrow> 'a state_element set \<Rightarrow> bool"
   where
     "code f s == s = { CodeElm(pos, i) | pos i. (pos, i) \<in> f }"
 
@@ -366,11 +366,11 @@ definition magic_filter :: "8 word list \<Rightarrow> bool" where
    (lst = word_rsplit a @ word_rsplit b) \<longrightarrow>
    hash2 a b \<noteq> 0)"
 
-definition no_assertion :: "constant_ctx \<Rightarrow> bool"
+definition no_assertion :: "'a constant_ctx \<Rightarrow> bool"
   where "no_assertion c == (\<forall> pos. program_annotation (cctx_program c) pos = [])
     \<and> cctx_hash_filter c = magic_filter"
 
-definition failed_for_reasons :: "failure_reason set \<Rightarrow> instruction_result \<Rightarrow> bool"
+definition failed_for_reasons :: "failure_reason set \<Rightarrow> 'a instruction_result \<Rightarrow> bool"
 where
 "failed_for_reasons allowed r =
  (allowed \<noteq> {} \<and>
@@ -380,7 +380,7 @@ where
 
 
 definition triple ::
- "failure_reason set \<Rightarrow> (state_element set \<Rightarrow> bool) \<Rightarrow> (int * inst) set \<Rightarrow> (state_element set \<Rightarrow> bool) \<Rightarrow> bool"
+ "failure_reason set \<Rightarrow> ('a state_element set \<Rightarrow> bool) \<Rightarrow> ('a * inst) set \<Rightarrow> ('a state_element set \<Rightarrow> bool) \<Rightarrow> bool"
 where
   "triple allowed_failures pre insts post ==
     \<forall> co_ctx presult rest stopper. no_assertion co_ctx \<longrightarrow>
@@ -474,7 +474,7 @@ lemma sep_program_counter_sep [simp] : "(a ** program_counter w ** rest) s =
 
 
 lemma leibniz :
-  "r (s :: state_element set) \<Longrightarrow> s = t \<Longrightarrow> r t"
+  "r (s :: 'a state_element set) \<Longrightarrow> s = t \<Longrightarrow> r t"
 apply(auto)
 done
 
@@ -491,12 +491,22 @@ done
 
 lemma sep_code [simp] : "(rest ** code pairs) s =
   ({ CodeElm(pos, i) | pos i. (pos, i) \<in> pairs } \<subseteq> s \<and> (rest (s - { CodeElm(pos, i) | pos i. (pos, i) \<in> pairs })))"
-	using code_sep by auto
+(*	using code_sep by auto*)
+apply(auto simp add: sep_def)
+  apply(simp add: code_def)
+ apply(simp add: code_def)
+ apply(rule leibniz)
+  apply blast
+ apply blast
+apply(auto simp add: code_def)
+done
 
 
 lemma sep_code_sep [simp] : "(a ** code pairs ** rest) s =
   ({ CodeElm(pos, i) | pos i. (pos, i) \<in> pairs } \<subseteq> s \<and> ((a ** rest) (s - { CodeElm(pos, i) | pos i. (pos, i) \<in> pairs })))"
-	by (metis (no_types, lifting) code_sep set_pred.left_commute)
+	by (metis (no_types, lifting) code_sep sep_code set_pred.left_commute)
+
+
 
 
 lemma sep_sep_code [simp] : "(a ** b ** code pairs) s =
@@ -589,7 +599,7 @@ lemma insert_minus : "a \<noteq> b \<Longrightarrow> insert a s - { b } = insert
   apply(simp add: insert_Diff_if)
   done
 
-lemma pred_functional : "p (s :: state_element set) \<Longrightarrow> s = t \<Longrightarrow> p t"
+lemma pred_functional : "p (s :: 'a state_element set) \<Longrightarrow> s = t \<Longrightarrow> p t"
 apply(auto)
 done
 

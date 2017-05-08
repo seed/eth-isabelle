@@ -11,6 +11,8 @@ type_synonym vertex = "int * tblock * inst list"
 type_synonym vertices = "vertex list"
 type_synonym edge = "int * (int option)"
 type_synonym edges = "int \<Rightarrow> edge option"
+type_synonym position = "int *int"
+type_synonym code_pos = "position * inst"
 
 datatype stack_value =
 Value "int" | Data
@@ -21,6 +23,7 @@ NEXT | GOTO "int" | GOTOIF "int" | UNDEFINED "char list" | NONE
 datatype edges_return = 
 Complete "edges" | Incomplete "edges * char list * stack_value list"
 
+type_synonym cfg = "vertices * edges_return"
 
 (* Auxiliary functions *)
 
@@ -187,5 +190,45 @@ done
 theorem reverse_basic_blocks: "reconstruct_bytecode (build_basic_blocks i) = i"
 apply(simp add: rev_basic_blocks)
 done
+
+(* subsection {* Parameterize functions for cfg program *} *)
+
+definition empty_cfg  :: " position program "  where 
+     " empty_cfg = ( (|
+  program_content = (\<lambda> _ .  None),
+  program_length =(( 0 :: int)),
+  program_annotation = (\<lambda> _ .  []),
+  program_advance_pc = (\<lambda>n.\<lambda>_. n),
+  program_next_block = (\<lambda>n.\<lambda>_. n),
+  program_pc_as_int = (\<lambda>_. 0),
+  program_pos_from_int = (\<lambda>_. (0,0)),
+  program_zero = (0,0)
+|) )"
+
+(** TODO **)
+definition cfg_advance_pc :: "position \<Rightarrow> int \<Rightarrow> position" where
+"cfg_advance_pc = (\<lambda>(n,m). \<lambda>i. (n, m))"
+
+definition cfg_next_block :: "position \<Rightarrow> int \<Rightarrow> position" where
+"cfg_next_block= (\<lambda>(n,m). \<lambda>_. (n,m))"
+
+definition cfg_pc_as_int :: "position \<Rightarrow> int" where
+"cfg_pc_as_int = (\<lambda>(n,m). n + m)"
+
+definition cfg_pos_from_int :: "int \<Rightarrow> position" where
+"cfg_pos_from_int = (\<lambda>n. (n,0) )"
+
+definition cfg_zero :: "position" where
+"cfg_zero = (0,0)"
+
+definition cfg_length :: "cfg \<Rightarrow> int " where
+"cfg_length = (\<lambda>c. 0)"
+
+definition cfg_content :: "cfg \<Rightarrow> position \<Rightarrow> inst option" where
+"cfg_content c = (\<lambda>(n,m). None)"
+
+definition cfg_of_lst :: "cfg \<Rightarrow> position program " where
+"cfg_of_lst c = 
+  program_of_lst cfg_advance_pc cfg_next_block cfg_pc_as_int cfg_pos_from_int cfg_zero cfg_length cfg_content c"
 
 end

@@ -35,17 +35,17 @@ type transaction = <|
   tr_data : list word8;
 |>
 
-type account = <|
+type account 'a = <|
   account_address : address;
   account_storage : storage;
-  account_code : program;
+  account_code : program 'a;
   account_balance : w256;
   account_nonce : w256;
   account_exists : bool;
   account_hascode : bool;
 |>
 
-val build_cctx : account -> constant_ctx
+val build_cctx : forall 'a. account 'a -> constant_ctx 'a
 let build_cctx a =
   <| cctx_program = a.account_code; cctx_this = a.account_address; cctx_hash_filter = (fun _ -> true) |>
 
@@ -56,7 +56,7 @@ let build_cctx a =
 (* Second I define the empty account, which replaces an account that has *)
 (* destroyed itself. *)
 
-val empty_account : address -> account
+val empty_account : address -> account integer
 let empty_account addr = <|
    account_address = addr;
    account_storage = empty_storage;
@@ -69,12 +69,12 @@ let empty_account addr = <|
 
 (* And after our contract makes a move, the account state is updated as follows. *)
 
-type world_state = address -> account
+type world_state 'a = address -> account 'a
 
 let empty_state _ = empty_account
 
-type receipt = <|
-  receipt_state : world_state;
+type receipt 'a = <|
+  receipt_state : world_state 'a;
   receipt_cumulative_gas : w256;
   receipt_bloom : w256;
   receipt_logs : list log_entry;
@@ -85,7 +85,7 @@ type block = <|
   block_parent_hash : w256;
   block_uncles_hash : list w256;
   block_coinbase : address;
-  block_state : world_state;
+  block_state : world_state 'a;
   block_transactions : list (transaction * receipt);
   block_logs_bloom : w256;
   block_difficulty : w256;
@@ -101,7 +101,7 @@ let start_env a state args caller origin block =
     vctx_memory = empty_memory; (* The memory is also initialized for every invocation *)
      vctx_memory_usage = 0; (* The memory usage is initialized. *)
      vctx_storage = a.account_storage; (* The storage is taken from the account state *)
-     vctx_pc = 0; (* The program counter is initialized to zero *)
+     vctx_pc = a.account_code.program_zero; (* The program counter is initialized to zero *)
      vctx_balance = (fun (addr:address) -> (state addr).account_balance);
      vctx_caller = caller; (* the caller is specified by the environment *)
      vctx_value_sent = args.callarg_value; (* the sent value is specified by the environment *)
@@ -123,7 +123,7 @@ let create_env a state value data gas caller origin block =
     vctx_memory = empty_memory; (* The memory is also initialized for every invocation *)
      vctx_memory_usage = 0; (* The memory usage is initialized. *)
      vctx_storage = a.account_storage; (* The storage is taken from the account state *)
-     vctx_pc = 0; (* The program counter is initialized to zero *)
+     vctx_pc = a.account_code.program_zero; (* The program counter is initialized to zero *)
      vctx_balance = (fun (addr:address) -> (state addr).account_balance);
      vctx_caller = caller; (* the caller is specified by the environment *)
      vctx_value_sent = value; (* the sent value is specified by the environment *)
@@ -300,27 +300,27 @@ type stack_hint =
  | CreateAddress of address
  | ReturnTo of integer * integer
 
-type global = <|
-  g_orig : world_state;
-  g_stack : list (world_state * variable_ctx * constant_ctx * stack_hint);
-  g_current : world_state;
-  g_cctx : constant_ctx;
+type global 'a = <|
+  g_orig : world_state 'a;
+  g_stack : list (world_state 'a * variable_ctx 'a * constant_ctx 'a * stack_hint);
+  g_current : world_state 'a;
+  g_cctx : constant_ctx 'a;
   g_killed : list address;
-  g_vmstate : instruction_result;
+  g_vmstate : instruction_result 'a;
   g_create : bool;
 |>
 
-type tr_result = <|
-  f_state : world_state;
+type tr_result 'a = <|
+  f_state : world_state 'a;
   f_killed : list address;
   f_gas : integer;
   f_refund : integer;
 |>
 
-type global_state =
+type global_state 'a =
  | Unimplemented
- | Continue of global
- | Finished of tr_result
+ | Continue of global 'a
+ | Finished of tr_result 'a
 
 let get_hint = function
  | Just (a,b) -> ReturnTo a b
@@ -341,15 +341,12 @@ let codemap lst =
   let m = make_opt lst in
   (fun x -> if x < 0 then Nothing else get_opt m (natFromInteger x))
 
-let make_program bytes = <|
-       program_annotation = (fun _ -> []);
-       program_length = integerFromNat (List.length bytes);
-       program_content = codemap bytes |>
+let make_program bytes = program_int_of_lst codemap bytes
 
-val set_account_code : account -> list word8 -> account
+val set_account_code : account integer -> list word8 -> account integer
 let set_account_code acc bytes = <| acc with account_code = make_program bytes |>
 
-val update_world : world_state -> address -> account -> world_state
+val update_world : forall 'a. world_state 'a -> address -> account 'a -> world_state 'a
 let update_world state a_addr n_acc a = if a = a_addr then n_acc else state a
 
 let update_tr state addr value =

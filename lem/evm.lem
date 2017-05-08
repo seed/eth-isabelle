@@ -669,8 +669,8 @@ end
 (* The size of an opcode is useful for parsing a hex representation of an *)
 (* EVM code.  *)
 
-val inst_size : inst -> int
-let inst_size i = intFromNat (length (inst_code i))
+val inst_size : inst -> integer
+let inst_size i = integerFromNat (length (inst_code i))
 
 (* section "Gas schedule" *)
 
@@ -897,21 +897,33 @@ type contract_action =
 (* For performance reasons, the instructions can be stored in a binary tree that allows *)
 (* looking up instructions from the program counters. *)
 
-type program = <|
-  program_content : integer -> maybe inst; (* a way to look up instructions from positions *)
-  program_length  : integer; (* the length of the program in bytes *)
-  program_annotation : integer -> list annotation; (* a mapping from positions to annotations *)
+type program 'a = <|
+	program_content : 'a -> maybe inst ;
+ (* a way to look up instructions from positions *)
+  program_length  : integer;
+ (* the length of the program in bytes *)
+  program_annotation : 'a -> list annotation; (* a mapping from positions to annotations *)
+  program_advance_pc : 'a -> integer -> 'a; (* Method to increase the program counter *)
+  program_next_block : 'a -> integer -> 'a; (* method to know the next_block for a jump,
+    the 2nd parameter is the top of the stack *)
+  program_pc_as_int : 'a -> integer; (* Return the program counter from the position*)
+  program_pos_from_int : integer -> 'a; (* Return the corresponding position of an int*)
+  program_zero : 'a;
 |>
 
 (* The empty program is easy to define. *)
 
-val empty_program : program
+val empty_program : program integer
 let empty_program = <|
-  program_content = (fun _ -> Nothing);
+  program_content = (fun _ ->  Nothing);
   program_length = 0;
-  program_annotation = (fun _ -> [])
+  program_annotation = (fun _ ->   []);
+  program_advance_pc = (fun n _ -> n);
+  program_next_block = (fun n _ -> n);
+  program_pc_as_int = (fun _ -> 0);
+  program_pos_from_int = (fun n -> 0);
+  program_zero = 0;
 |>
-
 
 (* subsection "Translating an Instruction List into a Program" *)
 
@@ -922,17 +934,16 @@ let empty_program = <|
 (* Here is a function that inserts an annotation *)
 (* at a specified position. *)
 
-val prepend_annotation : integer -> annotation -> (integer -> list annotation) -> (integer -> list annotation)
-let prepend_annotation pos annot orig p = if pos = p then annot :: orig p else orig p
+val prepend_annotation : forall 'a. 'a -> annotation -> ('a -> list annotation) -> 'a -> list annotation
+let prepend_annotation pos annot orig p = if unsafe_structural_equality pos p then annot :: orig p else orig p
 
 (* Currently annotations are inserted into a mapping with Isabelle/HOL's mapping updates. *)
 (* When this causes performance problems, I need to switch to AVL trees again. *)
 
-val program_annotation_of_lst : int -> list inst -> integer -> list annotation
-let rec program_annotation_of_lst pos lst = match lst with
-| [] -> (fun _ -> [])
-| i :: rest -> program_annotation_of_lst (pos + inst_size i) rest
-end
+(* This function seems to always return the function that returns the empty list so I simplify it*)
+val program_annotation_of_lst : forall 'a 'b. 'b -> 'a -> list annotation
+let rec program_annotation_of_lst lst =
+	(fun _ -> [])
 declare termination_argument program_annotation_of_lst = automatic
 
 (* subsubsection {* Translating a list of instructions into a program *} *)
@@ -942,21 +953,48 @@ declare termination_argument program_annotation_of_lst = automatic
 (* an AVL tree, but this particular encoding is not part of the Lem definition. *)
 (* So such encoders are parametrised here. *)
 
-val program_of_lst : list inst -> (list inst -> (integer -> maybe inst)) -> program
-let program_of_lst lst program_content_formatter = <|
-  program_content = program_content_formatter lst;
-  program_length = integerFromNat (length lst);
-  program_annotation = program_annotation_of_lst 0 lst;
+val program_of_lst : forall 'a 'b. ('a -> integer -> 'a) -> ('a -> integer -> 'a) -> ('a -> integer) -> (integer -> 'a) -> 'a -> ('b -> integer) -> ('b -> 'a -> maybe inst) -> 'b -> program 'a
+let program_of_lst prog_advance_pc prog_next_block prog_pc_as_int prog_pos_from_int prog_zero prog_length prog_content_formatter lst = <|
+  program_content = (prog_content_formatter lst);
+  program_length = (prog_length lst);
+  program_annotation = (program_annotation_of_lst lst);
+  program_advance_pc = (prog_advance_pc);
+  program_next_block = (prog_next_block);
+  program_pc_as_int = (prog_pc_as_int);
+  program_pos_from_int = (prog_pos_from_int);
+  program_zero = (prog_zero);
 |>
+
+(* subsection {* Parameterize functions for program *} *)
+
+val int_advance_pc : integer -> integer -> integer
+let int_advance_pc = (fun n m -> n + m)
+
+val int_next_block : integer -> integer -> integer
+let int_next_block = (fun _ st -> st)
+
+val identity : integer -> integer
+let identity = (fun a -> a)
+
+val int_zero : integer
+let int_zero = 0
+
+val int_length : forall 'b. list 'b -> integer
+let int_length = (fun lst -> integerFromNat (length lst))
+
+val program_int_of_lst : forall 'b. (list 'b -> integer -> maybe inst)-> list 'b -> program integer
+let program_int_of_lst prog_content_formatter lst =
+  program_of_lst int_advance_pc int_next_block identity identity int_zero int_length prog_content_formatter lst
+
 
 (* subsection {* Program as a Byte Sequence *} *)
 
 (* For CODECOPY instruction, the program must be seen as a byte-indexed read-only memory. *)
 (* Such a memory is here implemented by a lookup on an AVL tree.*)
 
-val program_as_natural_map : program -> natural -> byte
+val program_as_natural_map : forall 'a. program 'a -> 'a -> byte
 let program_as_natural_map p idx =
-   match p.program_content (integerFromNatural idx) with
+   match p.program_content idx with
    | Nothing -> 0
    | Just inst ->
       match List.index (inst_code inst) 0 with
@@ -993,12 +1031,12 @@ type log_entry = <|
 
 (* The variable context contains information that is relatively volatile. *)
 
-type variable_ctx = <|
+type variable_ctx 'a = <|
   vctx_stack : list w256;
   vctx_memory : memory;
   vctx_memory_usage : integer; (* the current memory usage *)
   vctx_storage : storage;
-  vctx_pc : integer; (* the program counter *)
+  vctx_pc : 'a; (* the program counter *)
   vctx_balance : address -> w256; (* balances of all accounts *)
   vctx_caller : address; (* the caller's address *)
   vctx_value_sent : w256; (* the amount of Eth sent along the current invocation *)
@@ -1006,7 +1044,7 @@ type variable_ctx = <|
   vctx_storage_at_call : storage; (* the storage content at the invocation*)
   vctx_balance_at_call : address -> w256; (* the balances at the invocation *)
   vctx_origin : address; (* the external account that started the current transaction *)
-  vctx_ext_program : address -> program; (* the codes of all accounts *)
+  vctx_ext_program : address -> program 'a; (* the codes of all accounts *)
   vctx_block : block_info; (* the current block *)
   vctx_gas : integer; (* remaining gas before the instruction *)
   vctx_account_existence : address -> bool;
@@ -1016,8 +1054,8 @@ type variable_ctx = <|
 |>
 
 (* The constant context contains information that is rather stable. *)
-type constant_ctx = <|
-  cctx_program : program; (* the code in the account under verification. *)
+type constant_ctx 'a = <|
+  cctx_program : program 'a; (* the code in the account under verification. *)
   cctx_this : address; (* the address of the account under verification. *)
   cctx_hash_filter : list byte -> bool;
 |>
@@ -1027,23 +1065,23 @@ type constant_ctx = <|
 (* The result of program execution is microscopically defined by results of instruction *)
 (* executions.  The execution of a single instruction can result in the following cases: *)
 
-type instruction_result =
-| InstructionContinue of variable_ctx (* the execution should continue. *)
+type instruction_result 'a =
+| InstructionContinue of variable_ctx 'a (* the execution should continue. *)
 | InstructionAnnotationFailure (* the annotation turned out to be false. *)
 | InstructionToEnvironment of
   (* the execution has stopped; either for the moment just calling out another account, or *)
   (* finally finishing the current invocation *)
     contract_action   (* the contract's move *)
-  * variable_ctx      (* the last venv *)
+  * variable_ctx 'a      (* the last venv *)
   * maybe (integer * integer) (* the variable environment to return to *)
 
 (* When the contract fails, the result of the instruction always looks like this: *)
-val instruction_failure_result : variable_ctx -> list failure_reason -> instruction_result
+val instruction_failure_result : forall 'a. variable_ctx 'a -> list failure_reason -> instruction_result 'a
 let instruction_failure_result v reasons =
   InstructionToEnvironment (ContractFail reasons) v Nothing
 
 (* When the contract returns, the result of the instruction always looks like this: *)
-val instruction_return_result : list byte -> variable_ctx -> instruction_result
+val instruction_return_result : forall 'a. list byte -> variable_ctx 'a -> instruction_result 'a
 let instruction_return_result x v =
   InstructionToEnvironment (ContractReturn x) v Nothing
 
@@ -1057,7 +1095,7 @@ let instruction_return_result x v =
 (* we are analyzing a single invocation of a loopless contract, but *)
 (* gas accounting is a planned feature. *)
 
-val gas : variable_ctx -> w256
+val gas : forall 'a. variable_ctx 'a -> w256
 let gas v = word256FromInteger v.vctx_gas
 
 (* This $M$ function is defined at the end of H.1.\,in the yellow paper. *)
@@ -1072,17 +1110,17 @@ val update_balance : address -> (w256 -> w256) -> (address -> w256) -> (address 
 let update_balance a f orig x = if x = a then f (orig a) else orig x
 
 (* Popping stack elements: *)
-val vctx_pop_stack : nat -> variable_ctx -> variable_ctx
+val vctx_pop_stack : forall 'a. nat -> variable_ctx 'a -> variable_ctx 'a
 let vctx_pop_stack n v =
  <| v with vctx_stack = drop n v.vctx_stack |>
 
 (* Updating the storage at an index: *)
-val vctx_update_storage : w256 -> w256-> variable_ctx -> variable_ctx
+val vctx_update_storage : forall 'a. w256 -> w256-> variable_ctx 'a -> variable_ctx 'a
 let vctx_update_storage idx vall v =
   <| v with vctx_storage = (fun x -> if x = idx then vall else v.vctx_storage x) |>
 
 (* Peeking the next instruction: *)
-val vctx_next_instruction : variable_ctx -> constant_ctx -> maybe inst
+val vctx_next_instruction : forall 'a. variable_ctx 'a -> constant_ctx 'a -> maybe inst
 let vctx_next_instruction v c =
   match c.cctx_program.program_content v.vctx_pc with
   | Just i -> Just i
@@ -1090,32 +1128,32 @@ let vctx_next_instruction v c =
   end
 
 (* Advancing the program counter: *)
-val vctx_advance_pc : constant_ctx -> variable_ctx -> variable_ctx
+val vctx_advance_pc : forall 'a. constant_ctx 'a -> variable_ctx 'a -> variable_ctx 'a
 let vctx_advance_pc c v =
   <| v with vctx_pc =
      (match vctx_next_instruction v c with
-     | Nothing -> v.vctx_pc + 1
-     | Just inst -> v.vctx_pc + integerFromInt (inst_size inst) end) |>
+     | Nothing -> v.vctx_pc
+     | Just inst -> c.cctx_program.program_advance_pc v.vctx_pc (inst_size inst) end) |>
 
 (* No-op, which just advances the program counter: *)
-val stack_0_0_op : variable_ctx -> constant_ctx -> instruction_result
+val stack_0_0_op : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let stack_0_0_op v c = InstructionContinue (vctx_advance_pc c v)
 
 (* A general pattern of operations that pushes one element onto the stack:  *)
-val stack_0_1_op : variable_ctx -> constant_ctx -> w256 -> instruction_result
+val stack_0_1_op : forall 'a. variable_ctx 'a -> constant_ctx 'a -> w256 -> instruction_result 'a
 let stack_0_1_op v c w =
    InstructionContinue (vctx_advance_pc c <| v with vctx_stack = w :: v.vctx_stack |>)
 
 
 (* A general pattern of operations that transforms the topmost element of the stack: *)
-val stack_1_1_op : variable_ctx -> constant_ctx -> (w256 -> w256) -> instruction_result
+val stack_1_1_op : forall 'a. variable_ctx 'a -> constant_ctx 'a -> (w256 -> w256) -> instruction_result 'a
 let stack_1_1_op v c f = match v.vctx_stack with
   | [] -> instruction_failure_result v [TooShortStack]
   | h :: t -> InstructionContinue (vctx_advance_pc c <| v with vctx_stack = f h :: t |>)
 end
 
 (* A general pattern of operations that take two words and produce one word: *)
-val stack_2_1_op : variable_ctx -> constant_ctx -> (w256 -> w256 -> w256) -> instruction_result
+val stack_2_1_op : forall 'a. variable_ctx 'a -> constant_ctx 'a -> (w256 -> w256 -> w256) -> instruction_result 'a
 let stack_2_1_op v c f = match v.vctx_stack with
  | operand0 :: operand1 :: rest ->
        InstructionContinue
@@ -1124,7 +1162,7 @@ let stack_2_1_op v c f = match v.vctx_stack with
 end
 
 (* A general pattern of operations that take three words and produce one word: *)
-val stack_3_1_op : variable_ctx -> constant_ctx -> (w256 -> w256 -> w256 -> w256) -> instruction_result
+val stack_3_1_op : forall 'a. variable_ctx 'a -> constant_ctx 'a -> (w256 -> w256 -> w256 -> w256) -> instruction_result 'a
 let stack_3_1_op v c f = match v.vctx_stack with
  | operand0 :: operand1 :: operand2 :: rest ->
        InstructionContinue
@@ -1133,7 +1171,7 @@ let stack_3_1_op v c f = match v.vctx_stack with
 end
 
 (* Retrieve value of a stack element, or 0 if non-existent: *)
-val vctx_stack_default : int -> variable_ctx -> w256
+val vctx_stack_default : forall 'a. int -> variable_ctx 'a -> w256
 let vctx_stack_default idx v =
   match List.index v.vctx_stack (natFromInt idx) with
   | Just w -> w
@@ -1141,7 +1179,7 @@ let vctx_stack_default idx v =
   end
 
 (* Calculate active memory (i.e. vctx_memory_usage) after the execution of an instruction: *)
-val new_memory_consumption : inst -> variable_ctx -> integer
+val new_memory_consumption : forall 'a. inst -> variable_ctx 'a -> integer
 let new_memory_consumption i v =
   match i with
   | Arith SHA3 -> M v.vctx_memory_usage (vctx_stack_default 0 v) (vctx_stack_default 1 v)
@@ -1181,7 +1219,7 @@ let check_refund oldv newv = if oldv <> 0 && newv = 0 then 15000 else 0
 
 (* SSTORE changes the storage so it does not fit into any of the patterns defined above. *)
 
-val sstore : variable_ctx -> constant_ctx -> instruction_result
+val sstore : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let sstore v c = match v.vctx_stack with
  | addr :: vl :: stack_tail ->
       InstructionContinue (vctx_advance_pc c
@@ -1195,7 +1233,7 @@ end
 (* out of the current execution environments.  When I try to remove this step, I face some *)
 (* circular definitions of data types. *)
 
-val build_aenv : variable_ctx -> constant_ctx -> aenv
+val build_aenv : forall 'a. variable_ctx 'a -> constant_ctx 'a -> aenv
 let build_aenv v c = <|
   aenv_stack = v.vctx_stack;
   aenv_memory = v.vctx_memory;
@@ -1213,11 +1251,11 @@ let build_aenv v c = <|
 (* The JUMP instruction has the following meaning.  When it cannot find the JUMPDEST instruction *)
 (* at the destination, the execution fails. *)
 
-val jump : variable_ctx -> constant_ctx -> instruction_result
+val jump : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let jump v c = match v.vctx_stack with
  | [] -> instruction_failure_result v [TooShortStack]
  | pos :: tl ->
-     let v_new = <| v with vctx_stack = tl; vctx_pc = uint pos |> in
+     let v_new = <| v with vctx_stack = tl; vctx_pc = c.cctx_program.program_next_block (v.vctx_pc) (uint pos) |> in
      match vctx_next_instruction v_new c with
       | Just (Pc JUMPDEST) -> InstructionContinue v_new
       | _ -> instruction_failure_result v [InvalidJumpDestination]
@@ -1227,21 +1265,21 @@ end
 (* This function is a reminiscent of my struggle with the Isabelle/HOL simplifier. *)
 (* The second argument has no meaning but to control the Isabelle/HOL simplifier. *)
 
-val blockedInstructionContinue : variable_ctx -> bool -> instruction_result
+val blockedInstructionContinue : forall 'a. variable_ctx 'a -> bool -> instruction_result 'a
 let blockedInstructionContinue v _ = InstructionContinue v
 
 (* This is another reminiscent of my struggle against the Isabelle/HOL simplifier. *)
 (* Again, the simplifier is not allowed to expand the definition unless the second argument *)
 (* is known to be @{term True}.*)
 
-val blocked_jump : variable_ctx -> constant_ctx -> bool -> instruction_result
+val blocked_jump : forall 'a. variable_ctx 'a -> constant_ctx 'a -> bool -> instruction_result 'a
 let blocked_jump v c _ = jump v c
 
 val strict_if : forall 'a. bool -> (bool -> 'a) -> (bool -> 'a) -> 'a
 let strict_if b x y = if b then x true else y true
 
 (* The JUMPI instruction is implemented using the JUMP instruction. *)
-val jumpi : variable_ctx -> constant_ctx -> instruction_result
+val jumpi : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let jumpi v c = match v.vctx_stack with
  | pos :: cond :: rest ->
     let new_env = <| v with vctx_stack = pos :: rest |> in
@@ -1252,7 +1290,7 @@ let jumpi v c = match v.vctx_stack with
 end
 
 (* Looking up the call data size takes this work: *)
-val datasize : variable_ctx -> w256
+val datasize : forall 'a. variable_ctx 'a -> w256
 let datasize v = word256FromNat (length v.vctx_data_sent)
 
 val byte_list_fill_right : byte -> nat -> list byte -> list byte
@@ -1273,13 +1311,13 @@ let read_word_from_bytes idx lst =
     (byte_list_fill_right 0 32
         (take 32 (drop (natFromNatural idx) lst)))
 
-val cut_data : variable_ctx -> w256 -> w256
+val cut_data : forall 'a. variable_ctx 'a -> w256 -> w256
 let cut_data v idx = read_word_from_bytes (word256ToNatural idx) v.vctx_data_sent
 
-val cut_natural_map : natural -> natural -> (natural -> byte) -> list byte
-let rec cut_natural_map idx n nmap = match n with
+val cut_natural_map : forall 'a. 'a -> natural -> ('a -> byte) -> ('a -> integer -> 'a) -> list byte
+let rec cut_natural_map idx n nmap increase = match n with
  | 0 -> []
- | n + 1 -> nmap idx :: cut_natural_map (idx + 1) n nmap
+ | n + 1 -> nmap idx :: cut_natural_map (increase idx 1) n nmap increase
 end
 
 (* Cnew is the funciton denoted as C_\text{\tiny NEW} in the yellow paper.*)
@@ -1347,7 +1385,7 @@ let calc_memu_extra2 v = Cmem (new_memory_consumption (Misc DELEGATECALL) v) - C
 
 (* CALL instruction results in @{term ContractCall} action when there are enough stack elements *)
 (* (and gas, when we introduce the gas accounting). *)
-val call : variable_ctx -> constant_ctx -> instruction_result
+val call : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let call v c = match v.vctx_stack with
  | e0 :: e1 :: e2 :: e3 :: e4 :: e5 :: e6 :: rest ->
      (* strict_if (word256ULT (v.vctx_balance c.cctx_this) e2)
@@ -1357,7 +1395,7 @@ let call v c = match v.vctx_stack with
                 vctx_stack = (0 :: rest)
              |>
            ))) *)
-     
+
      InstructionToEnvironment (ContractCall
          <| callarg_gas = word256FromInteger (Ccallgas e0 e1 e2
                      (not (v.vctx_account_existence (w256_to_address e1))) v.vctx_gas (word256ToNatural v.vctx_block.block_number) (calc_memu_extra v));
@@ -1376,7 +1414,7 @@ let call v c = match v.vctx_stack with
 end
 
 (* DELEGATECALL is slightly different. *)
-val delegatecall : variable_ctx -> constant_ctx -> instruction_result
+val delegatecall : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let delegatecall v c = match v.vctx_stack with
  | e0 :: e1 :: e3 :: e4 :: e5 :: e6 :: rest ->
     (* if word256ULT (v.vctx_balance c.cctx_this) v.vctx_value_sent then
@@ -1404,7 +1442,7 @@ let delegatecall v c = match v.vctx_stack with
 end
 
 (* CALLCODE is another variant. *)
-val callcode : variable_ctx -> constant_ctx -> instruction_result
+val callcode : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let callcode v c = match v.vctx_stack with
  | e0 :: e1 :: e2 :: e3 :: e4 :: e5 :: e6 :: rest ->
     (* if word256ULT (v.vctx_balance  c.cctx_this) e2 then
@@ -1433,7 +1471,7 @@ let callcode v c = match v.vctx_stack with
 end
 
 (* CREATE is also similar because the instruction causes execution on another account. *)
-val create : variable_ctx -> constant_ctx -> instruction_result
+val create : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let create v c = match v.vctx_stack with
   | vl :: code_start :: code_len :: rest ->
       if word256ULT (v.vctx_balance c.cctx_this) vl then
@@ -1465,7 +1503,7 @@ let vctx_returned_bytes v = match v.vctx_stack with
 end
 
 (* RETURN is modeled like this: *)
-val ret : variable_ctx -> constant_ctx -> instruction_result
+val ret : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let ret v _ =  match v.vctx_stack with
  | _ :: _ :: _ ->
      InstructionToEnvironment (ContractReturn (vctx_returned_bytes v))
@@ -1475,19 +1513,19 @@ let ret v _ =  match v.vctx_stack with
 end
 
 (* STOP is simpler than RETURN: *)
-val stop : variable_ctx -> constant_ctx -> instruction_result
+val stop : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let stop v _ =
     InstructionToEnvironment (ContractReturn []) v Nothing
 
 (* POP removes the topmost element of the stack: *)
-val pop : variable_ctx -> constant_ctx -> instruction_result
+val pop : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let pop v c = match v.vctx_stack with
  | _ :: tl -> InstructionContinue (vctx_advance_pc c <| v with vctx_stack = tl |>)
  | [] -> instruction_failure_result v [TooShortStack]
 end
 
 (* The DUP instructions: *)
-val general_dup : nibble -> variable_ctx -> constant_ctx -> instruction_result
+val general_dup : forall 'a. nibble -> variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let general_dup n v c = match List.index v.vctx_stack (word4ToNat n) with
   | Nothing -> instruction_failure_result v [TooShortStack]
   | Just duplicated -> InstructionContinue (vctx_advance_pc c <| v with vctx_stack = duplicated :: v.vctx_stack |>)
@@ -1513,7 +1551,7 @@ let store_word_memory pos vl mem =
    store_byte_list_memory pos (word_rsplit256 vl) mem
 
 (* MSTORE writes one word to the memory: *)
-val mstore : variable_ctx -> constant_ctx -> instruction_result
+val mstore : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let mstore v c = match v.vctx_stack with
   | pos :: vl :: rest ->
        let new_memory = store_word_memory pos vl v.vctx_memory in
@@ -1523,7 +1561,7 @@ let mstore v c = match v.vctx_stack with
 end
 
 (* MLOAD reads one word from the memory: *)
-val mload : variable_ctx -> constant_ctx -> instruction_result
+val mload : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let mload v c = match v.vctx_stack with
  | pos :: rest ->
       let value = read_word_from_bytes 0 (cut_memory pos 32 v.vctx_memory) in
@@ -1533,7 +1571,7 @@ let mload v c = match v.vctx_stack with
 end
 
 (* MSTORE8 writes one byte to the memory: *)
-val mstore8 : variable_ctx -> constant_ctx -> instruction_result
+val mstore8 : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let mstore8 v c = match v.vctx_stack with
  | pos :: vl :: rest ->
    let new_memory = (fun p -> if p = pos then w256_to_byte vl else v.vctx_memory p) in
@@ -1544,9 +1582,9 @@ let mstore8 v c = match v.vctx_stack with
 end
 
 (* For CALLDATACOPY, I need to look at the caller's data as memory. *)
-val input_as_natural_map : list byte -> natural -> byte
-let input_as_natural_map lst (idx : natural) =
-  let idx = integerFromNatural idx in
+val input_as_natural_map : forall 'a. list byte -> ('a -> integer) -> 'a -> byte
+let input_as_natural_map lst to_int idx =
+  let idx = to_int idx in
   if 0 > idx then 0
   else if integerFromNat (length lst) <= idx then 0
   else
@@ -1556,10 +1594,10 @@ let input_as_natural_map lst (idx : natural) =
     end
 
 (* CALLDATACOPY: *)
-val calldatacopy : variable_ctx -> constant_ctx -> instruction_result
-let calldatacopy v c = match v.vctx_stack with
+val calldatacopy : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
+let calldatacopy v c = let p = c.cctx_program in match v.vctx_stack with
  | dst_start :: src_start :: len :: rest ->
-       let data = cut_natural_map (word256ToNatural src_start) (word256ToNatural len) (input_as_natural_map v.vctx_data_sent) in
+       let data = cut_natural_map (p.program_pos_from_int (word256ToInteger src_start)) (word256ToNatural len) (input_as_natural_map v.vctx_data_sent p.program_pc_as_int) p.program_advance_pc in
        let new_memory = store_byte_list_memory dst_start data v.vctx_memory in
        InstructionContinue (vctx_advance_pc c
          <| v with vctx_stack = rest; vctx_memory = new_memory |>)
@@ -1567,11 +1605,11 @@ let calldatacopy v c = match v.vctx_stack with
 end
 
 (* CODECOPY copies a region of the currently running code to the memory: *)
-val codecopy : variable_ctx -> constant_ctx -> instruction_result
-let codecopy v c = match v.vctx_stack with
+val codecopy : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
+let codecopy v c = let p = c.cctx_program in match v.vctx_stack with
  | dst_start :: src_start :: len :: rest ->
-     let data = cut_natural_map (word256ToNatural src_start) (word256ToNatural len)
-                  (program_as_natural_map c.cctx_program) in
+     let data = cut_natural_map (p.program_pos_from_int (word256ToInteger src_start)) (word256ToNatural len)
+                  (program_as_natural_map p) p.program_advance_pc  in
      let new_memory = store_byte_list_memory dst_start data v.vctx_memory in
      InstructionContinue (vctx_advance_pc c
        <| v with vctx_stack = rest; vctx_memory = new_memory |>)
@@ -1579,12 +1617,12 @@ let codecopy v c = match v.vctx_stack with
 end
 
 (* EXTCODECOPY copies a region of the code of an arbitrary account.: *)
-val extcodecopy : variable_ctx -> constant_ctx -> instruction_result
-let extcodecopy v c = match v.vctx_stack with
+val extcodecopy : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
+let extcodecopy v c = let p = c.cctx_program in match v.vctx_stack with
  | addr :: dst_start :: src_start :: len :: rest ->
-     let data = cut_natural_map (word256ToNatural src_start) (word256ToNatural len)
+     let data = cut_natural_map (p.program_pos_from_int (word256ToInteger src_start)) (word256ToNatural len)
                   (program_as_natural_map
-                    (v.vctx_ext_program (w256_to_address addr))) in
+                    (v.vctx_ext_program (w256_to_address addr))) p.program_advance_pc in
      let new_memory = store_byte_list_memory dst_start data v.vctx_memory in
      InstructionContinue (vctx_advance_pc c
        <| v with vctx_stack = rest; vctx_memory = new_memory |>)
@@ -1592,12 +1630,12 @@ let extcodecopy v c = match v.vctx_stack with
 end
 
 (* PC instruction could be implemented by @{term stack_0_1_op}: *)
-val pc : variable_ctx -> constant_ctx -> instruction_result
+val pc : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let pc v c =
    InstructionContinue (vctx_advance_pc c
-     <| v with vctx_stack = word256FromInteger v.vctx_pc :: v.vctx_stack|>)
+     <| v with vctx_stack = word256FromInteger (c.cctx_program.program_pc_as_int v.vctx_pc) :: v.vctx_stack|>)
 
-val create_log_entry : nat -> variable_ctx -> constant_ctx -> log_entry
+val create_log_entry : forall 'a. nat -> variable_ctx 'a -> constant_ctx 'a -> log_entry
 let create_log_entry n v c =
   <| log_addr = c.cctx_this
    ; log_topics = drop 2 (take (n + 2) v.vctx_stack)
@@ -1605,7 +1643,7 @@ let create_log_entry n v c =
   |>
 
 (* Logging is currently no-op, until some property about event logging is wanted. *)
-val log : nat -> variable_ctx -> constant_ctx -> instruction_result
+val log : forall 'a. nat -> variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let log n v c =
    let new_log_entry = create_log_entry n v c in
    InstructionContinue
@@ -1620,14 +1658,14 @@ let list_swap n lst = match (index lst n, index lst 0) with
 end
 
 (* Using this, I can specify the SWAP operations: *)
-val swap : nat -> variable_ctx -> constant_ctx -> instruction_result
+val swap : forall 'a. nat -> variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let swap n v c = match list_swap (n + 1) v.vctx_stack with
  | Nothing -> instruction_failure_result v [TooShortStack]
  | Just new_stack -> InstructionContinue (vctx_advance_pc c <| v with vctx_stack = new_stack |>)
 end
 
 (* SHA3 instruciton in the EVM is actually Keccak 256. *)
-val sha3 : variable_ctx -> constant_ctx -> instruction_result
+val sha3 : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let sha3 v c = match v.vctx_stack with
  | start :: len :: rest ->
       let lst = cut_memory start len v.vctx_memory in
@@ -1639,7 +1677,7 @@ let sha3 v c = match v.vctx_stack with
 end
 
 (* The SUICIDE instruction involves value transfer. *)
-val suicide : variable_ctx -> constant_ctx -> instruction_result
+val suicide : forall 'a. variable_ctx 'a -> constant_ctx 'a -> instruction_result 'a
 let suicide v c = match v.vctx_stack with
  | dst :: _ ->
      InstructionToEnvironment (ContractSuicide (w256_to_address dst)) v Nothing
@@ -1741,14 +1779,14 @@ let C old_memory_consumption new_memory_consumption i s0 s1 s2 s3 recipient_empt
   Cmem new_memory_consumption  - Cmem old_memory_consumption +
   thirdComponentOfC i s0 s1 s2 s3 recipient_empty orig new_val remaining_gas blocknumber (Cmem new_memory_consumption  - Cmem old_memory_consumption)
 
-val vctx_next_instruction_default : variable_ctx -> constant_ctx -> inst
+val vctx_next_instruction_default : forall 'a. variable_ctx 'a -> constant_ctx 'a -> inst
 let vctx_next_instruction_default v c =
     match vctx_next_instruction v c with
     | Just i -> i
     | Nothing -> Misc STOP
     end
 
-val vctx_recipient : variable_ctx -> constant_ctx -> address
+val vctx_recipient : forall 'a. variable_ctx 'a -> constant_ctx 'a -> address
 let vctx_recipient v c =
   match vctx_next_instruction_default v c with
   | Misc SUICIDE -> w256_to_address (vctx_stack_default 0 v)
@@ -1758,14 +1796,14 @@ let vctx_recipient v c =
   | _ -> 0
   end
 
-val meter_gas : inst -> variable_ctx -> constant_ctx -> integer
+val meter_gas : forall 'a. inst -> variable_ctx 'a -> constant_ctx 'a -> integer
 let meter_gas i v c =
   C v.vctx_memory_usage (new_memory_consumption i v) (vctx_next_instruction_default v c)
     (vctx_stack_default 0 v) (vctx_stack_default 1 v) (vctx_stack_default 2 v) (vctx_stack_default 3 v)
     (not (v.vctx_account_existence (vctx_recipient v c))) (v.vctx_storage (vctx_stack_default 0 v))
     (vctx_stack_default 1 v) v.vctx_gas (word256ToNatural v.vctx_block.block_number)
 
-val check_resources : variable_ctx -> constant_ctx -> list w256 -> inst -> bool
+val check_resources : forall 'a. variable_ctx 'a -> constant_ctx 'a -> list w256 -> inst -> bool
 let check_resources v c s i =
   match inst_stack_numbers i with
   | (consumed, produced) ->
@@ -1774,7 +1812,7 @@ let check_resources v c s i =
   end
 
 
-val subtract_gas : integer -> integer -> instruction_result -> instruction_result
+val subtract_gas : forall 'a. integer -> integer -> instruction_result 'a -> instruction_result 'a
 let subtract_gas consumption memory_usage orig =
   match orig with
   | InstructionContinue v ->
@@ -1798,7 +1836,7 @@ let signextend len w =
 
 (* Finally, using the above definitions, I can define a function that operates an instruction *)
 (* on the execution environments. *)
-val instruction_sem : variable_ctx -> constant_ctx -> inst -> instruction_result
+val instruction_sem : forall 'a. variable_ctx 'a -> constant_ctx 'a -> inst -> instruction_result 'a
 let instruction_sem v c inst =
   subtract_gas (meter_gas inst v c) (new_memory_consumption inst v)
   (match inst with
@@ -1931,13 +1969,13 @@ let instruction_sem v c inst =
 
 (* Since our program struct contains a list of annotations for each program position, *)
 (* I have a function that checks all annotations at a particular program position: *)
-val check_annotations : variable_ctx -> constant_ctx -> bool
+val check_annotations : forall 'a. variable_ctx 'a -> constant_ctx 'a -> bool
 let check_annotations v c =
   let annots : list annotation = c.cctx_program.program_annotation v.vctx_pc in
   List.all (fun annot -> annot (build_aenv v c)) annots
 
 
-val next_state: (instruction_result -> unit) -> constant_ctx -> instruction_result -> instruction_result
+val next_state: forall 'a. (instruction_result 'a -> unit) -> constant_ctx 'a -> instruction_result 'a -> instruction_result 'a
 let next_state stopper c pr =
   match pr with
   | InstructionToEnvironment _ _ _ ->
@@ -1972,7 +2010,7 @@ let next_state stopper c pr =
 (* Also, during the proofs, I can do case analysis on the number of backwad jumps *)
 (* rather than the number of instructions. *)
 
-val program_sem :  (instruction_result -> unit) -> constant_ctx -> nat -> instruction_result -> instruction_result
+val program_sem : forall 'a.  (instruction_result 'a -> unit) -> constant_ctx 'a -> nat -> instruction_result 'a -> instruction_result 'a
 let rec program_sem stopper c fuel pr =
 match fuel with
  | 0 -> pr
@@ -1988,12 +2026,12 @@ declare termination_argument program_sem = automatic
 (* keep track of the ongoing executions of a single account.  Also I need to keep track of *)
 (* a flag indicating if the account has already marked for erasure. *)
 
-type account_state = <|
+type account_state 'a = <|
   account_address : address;
   account_storage : storage;
-  account_code : program;
+  account_code : program 'a;
   account_balance : w256;
-  account_ongoing_calls : list (variable_ctx * integer * integer);
+  account_ongoing_calls : list (variable_ctx 'a * integer * integer);
     (* the variable environments that are executing on this account, but waiting for calls to finish *)
   account_killed : bool;
     (* the boolean that indicates the account has executed SUICIDE in this transaction. *)
@@ -2009,7 +2047,7 @@ type account_state = <|
 (* Construction of the constant environment is much simpler than that of *)
 (* a variable environment. *)
 
-val build_cctx : account_state -> constant_ctx
+val build_cctx : forall 'a. account_state 'a -> constant_ctx 'a
 let build_cctx a =
   <| cctx_program = a.account_code; cctx_this = a.account_address; cctx_hash_filter = (fun _ -> true) |>
 
@@ -2023,16 +2061,16 @@ val is_call_like : maybe inst -> bool
 let is_call_like i = (i = Just (Misc CALL) || i = Just (Misc DELEGATECALL)
                  || i = Just (Misc CALLCODE) || i = Just (Misc CREATE))
 
-val build_vctx_failed : account_state -> maybe variable_ctx
+val build_vctx_failed : forall 'a. account_state 'a -> maybe (variable_ctx 'a)
 let build_vctx_failed a = match a.account_ongoing_calls with
  | [] -> Nothing
  | (recovered,_,_) :: _ ->
-      if is_call_like ((a.account_code).program_content (recovered.vctx_pc - 1)) then
+      if is_call_like ((a.account_code).program_content ((a.account_code).program_advance_pc recovered.vctx_pc (~1))) then
       Just (<| recovered with vctx_stack = 0 :: recovered.vctx_stack |>) (* 0 is pushed, indicating failure*)
       else Nothing
 end
 
-val account_state_pop_ongoing_call : account_state -> account_state
+val account_state_pop_ongoing_call : forall 'a. account_state 'a -> account_state 'a
 let account_state_pop_ongoing_call orig = match orig.account_ongoing_calls with
  | _ :: tl -> <| orig with account_ongoing_calls = tl |>
  | _ -> <| orig with account_ongoing_calls = [] |>
@@ -2041,7 +2079,7 @@ end
 (* Second I define the empty account, which replaces an account that has *)
 (* destroyed itself. *)
 
-val empty_account : address -> account_state
+val empty_account : address -> account_state integer
 let empty_account addr =
  <| account_address = addr;
     account_storage = empty_storage;
@@ -2053,8 +2091,8 @@ let empty_account addr =
 
 (* And after our contract makes a move, the account state is updated as follows. *)
 
-val update_account_state :
-  account_state -> contract_action -> variable_ctx -> maybe (integer * integer) -> account_state
+val update_account_state : forall 'a.
+  account_state 'a -> contract_action -> variable_ctx 'a -> maybe (integer * integer) -> account_state 'a
 let update_account_state prev act v v_opt =
    let st = (match act with ContractFail _ -> v.vctx_storage_at_call | _ -> v.vctx_storage end) in
    let bal = (match act with ContractFail _ -> v.vctx_balance_at_call | _ -> v.vctx_balance end) in
@@ -2070,12 +2108,12 @@ let update_account_state prev act v v_opt =
                   | _ -> prev.account_killed end)
     |>
 
-type contract_behavior = contract_action * (account_state -> bool)
+type contract_behavior 'a = contract_action * (account_state 'a -> bool)
 
-type response_to_environment = <|
-  when_called : call_env -> contract_behavior;
-  when_returned : return_result -> contract_behavior;
-  when_failed : contract_behavior;
+type response_to_environment 'a = <|
+  when_called : call_env -> contract_behavior 'a;
+  when_returned : return_result -> contract_behavior 'a;
+  when_failed : contract_behavior 'a ;
 |>
 
 val empty_memory : memory
@@ -2088,7 +2126,7 @@ let empty_memory = (fun _ -> 0)
 (* The origin of the transaction is also considered arbitrary.*)
 
 
-indreln [build_vctx_called : account_state -> call_env -> variable_ctx -> bool]
+indreln [build_vctx_called : forall 'a. account_state 'a -> call_env -> variable_ctx 'a -> bool]
   vctx_called : forall bal a env origin ext block gas existence.
     word256ToNatural block.block_number >= eip150_block && (* only the newest version of EVM matters *)
     bal a.account_address = a.account_balance ==>
@@ -2097,7 +2135,7 @@ indreln [build_vctx_called : account_state -> call_env -> variable_ctx -> bool]
     vctx_memory = empty_memory; (* The memory is also initialized for every invocation *)
      vctx_memory_usage = 0; (* The memory usage is initialized. *)
      vctx_storage = a.account_storage; (* The storage is taken from the account state *)
-     vctx_pc = 0; (* The program counter is initialized to zero *)
+     vctx_pc = a.account_code.program_zero; (* The program counter is initialized to zero *)
      vctx_balance = (fun (addr:address) ->
                          if addr = a.account_address
                            then bal a.account_address + env.callenv_value else bal addr);
@@ -2126,13 +2164,13 @@ indreln [build_vctx_called : account_state -> call_env -> variable_ctx -> bool]
 (* our contract might increase because some other contracts might have destroyed themselves, *)
 (* transferring value to our contract.*)
 
-indreln [build_vctx_returned : account_state -> return_result -> variable_ctx -> bool]
+indreln [build_vctx_returned : forall 'a. account_state 'a -> return_result -> variable_ctx 'a -> bool]
 vctx_returned:
    forall a_code v_pc new_bal a_bal a_addr a_storage v_stack v_memory v_memory_usage
           v_storage v_balance v_caller v_value v_data v_init_storage v_init_balance
           v_origin v_ext_program v_ext_program' v_block v_gas v_gas' mem_start mem_size
           r rest whichever v_ex v_ex' v_touched v_logs v_refund.
-   (is_call_like (a_code.program_content (v_pc - 1))) &&
+   (is_call_like (a_code.program_content (a_code.program_advance_pc v_pc (~ 1)))) &&
    (word256UGE new_bal a_bal) ==> (* the balance might have increased *)
    build_vctx_returned
 
