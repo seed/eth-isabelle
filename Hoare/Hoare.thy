@@ -1,6 +1,6 @@
 theory Hoare
 
-imports Main "../lem/Evm"
+imports Main "../attic/CFG"
 
 begin
 
@@ -51,6 +51,7 @@ datatype 'a state_element =
   | DifficultyElm "w256"
   | GaslimitElm "w256"
   | GaspriceElm "w256"
+  | BlockTypeElm "tblock"
 
 abbreviation blockhash_as_elm :: "(w256 \<Rightarrow> w256) \<Rightarrow> 'a state_element set"
 where "blockhash_as_elm f == { BlockhashElm (n, h) | n h. f n = h}"
