@@ -7,12 +7,14 @@ begin
 datatype tblock =
 Next | Jump | Jumpi | No
 
-type_synonym vertex = "int * tblock * inst list"
+type_synonym position = "int *int"
+type_synonym pos_inst = "position * inst"
+type_synonym vertex = "int * tblock * pos_inst list"
+type_synonym vertex_ = "tblock * pos_inst list"
 type_synonym vertices = "vertex list"
 type_synonym edge = "int * (int option)"
 type_synonym edges = "int \<Rightarrow> edge option"
-type_synonym position = "int *int"
-type_synonym code_pos = "position * inst"
+
 
 datatype stack_value =
 Value "int" | Data
@@ -24,6 +26,11 @@ datatype edges_return =
 Complete "edges" | Incomplete "edges * char list * stack_value list"
 
 type_synonym cfg = "vertices * edges_return"
+
+record cfg_ = 
+cfg_indexes :: "int list"
+cfg_blocks :: "int \<Rightarrow> vertex_ option"
+cfg_edges :: "edges"
 
 (* Auxiliary functions *)
 
@@ -46,7 +53,7 @@ definition find_block :: "int \<Rightarrow> vertex \<Rightarrow> bool" where
 fun good_dest :: "int \<Rightarrow> vertices \<Rightarrow> bool" where
   "good_dest m [] = False"
 | "good_dest m ((n,_,[])#l) = good_dest m l"
-| "good_dest m ((n,_, i#inst)#l) = (if m = n then (if i = Pc JUMPDEST then True else False) else good_dest m l )"
+| "good_dest m ((n,_, (_,i)#inst)#l) = (if m = n then (if i = Pc JUMPDEST then True else False) else good_dest m l )"
 
 fun not_complete :: "edges_return \<Rightarrow> char list \<Rightarrow> stack_value list\<Rightarrow> edges_return " where
   "not_complete (Complete edges) debug st= Incomplete (edges,debug,st)"
@@ -101,26 +108,27 @@ value "stack_dup [Value 1, Value 2, Value 3, Value 4] 2"
 (* The execution of a basic block must be sequential. *)
 (* We remove JUMP and JUMPI instructions and cut after them or a stopping instrction *)
 (* and before a Jump destination. *)
-fun aux_basic_block :: "inst list \<Rightarrow> int \<Rightarrow> int \<Rightarrow> inst list \<Rightarrow> vertices" where
+fun aux_basic_block :: "inst list \<Rightarrow> int \<Rightarrow> int \<Rightarrow> ((int*int)*inst) list \<Rightarrow> vertices" where
  "aux_basic_block [] pointer block_pt block = (if block = [] then [] else
     [(block_pt, No, rev block)])"
 |"aux_basic_block ((i)#tl1) pointer block_pt block = 
   (let newpointer = pointer + (inst_size i) in
+  (let pos = (block_pt, pointer - block_pt) in
   (case i of
-    Pc JUMPDEST \<Rightarrow> (if block = [] then (aux_basic_block tl1 newpointer pointer [i])
-    else (block_pt, Next, rev block) # (aux_basic_block tl1 newpointer pointer [i]))
-  | Pc JUMP \<Rightarrow>(block_pt, Jump, rev block) # ( aux_basic_block tl1 newpointer pointer [])
-  | Pc JUMPI \<Rightarrow>(block_pt, Jumpi, rev block) # ( aux_basic_block tl1 newpointer pointer [])
-  | Misc RETURN \<Rightarrow>(block_pt, No, rev (i#block)) # ( aux_basic_block tl1 newpointer pointer [])
-  | Misc SUICIDE \<Rightarrow>(block_pt, No, rev (i#block)) # ( aux_basic_block tl1 newpointer pointer [])
-  | Misc STOP \<Rightarrow>(block_pt, No, rev (i#block)) # ( aux_basic_block tl1 newpointer pointer [])
-  | _ \<Rightarrow> aux_basic_block tl1 newpointer block_pt (i#block)))"
+    Pc JUMPDEST \<Rightarrow> (if block = [] then (aux_basic_block tl1 newpointer pointer [((pointer,0),i)])
+    else (block_pt, Next, rev block) # (aux_basic_block tl1 newpointer pointer [((pointer,0),i)]))
+  | Pc JUMP \<Rightarrow>(block_pt, Jump, rev block) # ( aux_basic_block tl1 newpointer newpointer [])
+  | Pc JUMPI \<Rightarrow>(block_pt, Jumpi, rev block) # ( aux_basic_block tl1 newpointer newpointer [])
+  | Misc RETURN \<Rightarrow>(block_pt, No, rev ((pos,i)#block)) # ( aux_basic_block tl1 newpointer newpointer [])
+  | Misc SUICIDE \<Rightarrow>(block_pt, No, rev ((pos,i)#block)) # ( aux_basic_block tl1 newpointer newpointer [])
+  | Misc STOP \<Rightarrow>(block_pt, No, rev ((pos,i)#block)) # ( aux_basic_block tl1 newpointer newpointer [])
+  | _ \<Rightarrow> aux_basic_block tl1 newpointer block_pt ((pos,i)#block))))"
 
 abbreviation build_basic_blocks :: "inst list \<Rightarrow> vertices" where
 "build_basic_blocks prog == aux_basic_block prog 0 0 []"
 
 (* Read a block *)
-fun edge_one_block :: "tblock \<Rightarrow> inst list \<Rightarrow> stack_value list \<Rightarrow> (edge_return * stack_value list)" where
+fun edge_one_block :: "tblock \<Rightarrow> pos_inst list \<Rightarrow> stack_value list \<Rightarrow> (edge_return * stack_value list)" where
   "edge_one_block Next [] st = (NEXT, st)"
 | "edge_one_block Jump [] [] = (UNDEFINED ''JUMP : Empty stack'',[])"
 | "edge_one_block Jump [] (a#st) = (case a of
@@ -132,16 +140,16 @@ fun edge_one_block :: "tblock \<Rightarrow> inst list \<Rightarrow> stack_value 
       Value add \<Rightarrow> (GOTOIF add,st)
     | Data \<Rightarrow> (UNDEFINED ''JUMPI : Data on top of the stack'',a#st))"
 | "edge_one_block No [] st = (NONE,st)"
-| "edge_one_block t ((Stack (PUSH_N data))#bl) st = edge_one_block t bl ((Value (byteListInt data))#st)"
-| "edge_one_block t ((Swap i)#bl) st = (let min_height = unat i + 1 in
+| "edge_one_block t ((_,(Stack (PUSH_N data)))#bl) st = edge_one_block t bl ((Value (byteListInt data))#st)"
+| "edge_one_block t ((_,Swap i)#bl) st = (let min_height = unat i + 1 in
     (if min_height>length st 
      then (UNDEFINED ''Swap : stack too small'',st)
      else edge_one_block t bl (stack_swap st min_height)))"
-| "edge_one_block t ((Dup i)#bl) st = (let min_height = unat i in
+| "edge_one_block t ((_,Dup i)#bl) st = (let min_height = unat i in
     (if min_height>length st 
      then (UNDEFINED ''Dup : stack too small'',st)
      else edge_one_block t bl (stack_dup st min_height)))"
-| "edge_one_block t (i#bl) st = (let st_nb= (inst_stack_numbers i) in
+| "edge_one_block t ((_,i)#bl) st = (let st_nb= (inst_stack_numbers i) in
     (if (nat (fst st_nb))>length st 
      then (UNDEFINED ''Stack too small'',st)
      else edge_one_block t bl ((replicate (nat (snd st_nb)) Data)@(drop (nat (fst st_nb)) st))))"
@@ -169,20 +177,25 @@ fun edges_blocks :: "int list \<Rightarrow> int \<Rightarrow> stack_value list \
         else not_complete (update_edges (edges_blocks new_to_do m (snd res) vertices) n (i, Some m)) ''Bad destination for JUMPI'' st))
 ))))))"
 
-definition build_cfg :: "inst list \<Rightarrow> (vertices * edges_return)" where
-"build_cfg prog = (let res = build_basic_blocks prog in
-(res, edges_blocks (extract_indexes res) 0 [] res ))"
+definition build_cfg :: "inst list \<Rightarrow> cfg_" where
+"build_cfg prog = (let blocks = build_basic_blocks prog in
+(let ind = (extract_indexes blocks) in
+(let edges = deconstruct (edges_blocks ind 0 [] blocks) in
+(|cfg_indexes = ind,
+cfg_blocks = map_of blocks,
+cfg_edges = edges |)
+)))"
 
 (* Verification *)
 
 (* Check that we can rebuild the initial list of instructions from basic blocks *)
 fun reconstruct_bytecode :: "vertices \<Rightarrow> inst list" where
  "reconstruct_bytecode [] = []"
-| "reconstruct_bytecode ((n,Jump,b)#q) = b@[Pc JUMP] @ (reconstruct_bytecode q)" 
-| "reconstruct_bytecode ((n,Jumpi,b)#q) = b@[Pc JUMPI] @ (reconstruct_bytecode q)" 
-| "reconstruct_bytecode ((n,_,b)#q) = b @ (reconstruct_bytecode q)" 
+| "reconstruct_bytecode ((n,Jump,b)#q) = (map snd b)@[Pc JUMP] @ (reconstruct_bytecode q)" 
+| "reconstruct_bytecode ((n,Jumpi,b)#q) = (map snd b)@[Pc JUMPI] @ (reconstruct_bytecode q)" 
+| "reconstruct_bytecode ((n,_,b)#q) = (map snd b) @ (reconstruct_bytecode q)" 
 
-lemma rev_basic_blocks: "reconstruct_bytecode (aux_basic_block i p bp b) = (rev b)@i"
+lemma rev_basic_blocks: "reconstruct_bytecode (aux_basic_block i p bp b) = (map snd (rev b))@i"
 apply(induction i arbitrary: p bp b)
 apply(auto simp: Let_def split: inst.split misc_inst.split pc_inst.split)
 done
@@ -207,7 +220,7 @@ definition empty_cfg  :: " position program "  where
 
 (** TODO **)
 definition cfg_advance_pc :: "position \<Rightarrow> int \<Rightarrow> position" where
-"cfg_advance_pc = (\<lambda>(n,m). \<lambda>i. (n, m))"
+"cfg_advance_pc = (\<lambda>(n,m). \<lambda>i. (n, m+i))"
 
 definition cfg_next_block :: "position \<Rightarrow> int \<Rightarrow> position" where
 "cfg_next_block= (\<lambda>(n,m). \<lambda>_. (n,m))"
