@@ -20,7 +20,7 @@ The considered basic blocks is the one pointed by the program counter of the pre
 Here we assume that we always are at the beginning of a block.
 The post-condition holds after executing the basic block + the transition to the next block. *}
 inductive
-  run_one :: "cfg_ \<Rightarrow> pred \<Rightarrow> pred \<Rightarrow> bool" 
+  run_one :: "cfg \<Rightarrow> pred \<Rightarrow> pred \<Rightarrow> bool" 
 where
   one_no: "\<lbrakk> Some (No,co) = cfg_blocks c n; cfg_triple {} (program_counter (n,0) ** pre) co post\<rbrakk> 
   \<Longrightarrow> run_one c (program_counter (n,0) ** pre) post"
@@ -66,7 +66,7 @@ The first considered basic blocks is the one pointed by the program counter of t
 Here we assume that we always are at the beginning of a block.
 The post-condition holds after executing the basic block + all the other basic blocks that follow the first in the execution order. *}
 inductive
-  run_all :: "cfg_ \<Rightarrow> pred \<Rightarrow> pred \<Rightarrow> bool"
+  run_all :: "cfg \<Rightarrow> pred \<Rightarrow> pred \<Rightarrow> bool"
 where
   all_end : "\<lbrakk> Some (No,_) = cfg_blocks c n; run_one c (program_counter (n,0) ** pre) post\<rbrakk> 
   \<Longrightarrow> run_all c (program_counter (n,0) ** pre) post"
@@ -105,7 +105,7 @@ lemmas evm_fun_simps = inst_stack_numbers.simps stack_inst_code.simps inst_size_
 pc_inst_numbers.simps 
 misc_inst_numbers.simps
 
-lemmas cfg_def = build_cfg_def update_edges_def byteListInt_def find_block_def deconstruct_def
+lemmas cfg_def = build_cfg_def update_edges_def byteListInt_def find_block_def deconstruct_def extract_indexes_def
 
 schematic_goal c_val:
  " c = ?p"

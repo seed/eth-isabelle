@@ -48,7 +48,7 @@ push_n : "inst_rule (\<langle> h \<le> 1023 \<and> length lst > 0 \<and> 32 \<ge
  "inst_rule p i q \<Longrightarrow> (\<And>s. r s \<Longrightarrow> p s) \<Longrightarrow> inst_rule r i q"
 
 inductive
-  bl :: "cfg_ \<Rightarrow> pred \<Rightarrow> (pos_inst) list \<Rightarrow> pred \<Rightarrow> bool" 
+  bl :: "cfg \<Rightarrow> pred \<Rightarrow> (pos_inst) list \<Rightarrow> pred \<Rightarrow> bool" 
 where
   empty : " bl c ((blocktype No)** rest ** common) [] common"(*to improve*)
 | in_block : "\<lbrakk>inst_rule p x q; bl c q xs r\<rbrakk> \<Longrightarrow> bl c p (x#xs) r"
@@ -85,7 +85,7 @@ schematic_goal c_val:
  " c = ?p"
 apply(simp add: c_def build_cfg_def word_rcat_def bin_rcat_def Let_def 
 evm_fun_simps
-update_edges_def
+update_edges_def extract_indexes_def
   byteListInt_def find_block_def deconstruct_def split:if_splits nat.splits option.splits)
 done
 

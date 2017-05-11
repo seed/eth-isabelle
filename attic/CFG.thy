@@ -9,9 +9,8 @@ Next | Jump | Jumpi | No
 
 type_synonym position = "int *int"
 type_synonym pos_inst = "position * inst"
-type_synonym vertex = "int * tblock * pos_inst list"
-type_synonym vertex_ = "tblock * pos_inst list"
-type_synonym vertices = "vertex list"
+type_synonym vertex = "tblock * pos_inst list"
+type_synonym vertices = "(int * vertex) list"
 type_synonym edge = "int * (int option)"
 type_synonym edges = "int \<Rightarrow> edge option"
 
@@ -25,11 +24,9 @@ NEXT | GOTO "int" | GOTOIF "int" | UNDEFINED "char list" | NONE
 datatype edges_return = 
 Complete "edges" | Incomplete "edges * char list * stack_value list"
 
-type_synonym cfg = "vertices * edges_return"
-
-record cfg_ = 
+record cfg = 
 cfg_indexes :: "int list"
-cfg_blocks :: "int \<Rightarrow> vertex_ option"
+cfg_blocks :: "int \<Rightarrow> vertex option"
 cfg_edges :: "edges"
 
 (* Auxiliary functions *)
@@ -47,7 +44,7 @@ fun next_i :: "vertices \<Rightarrow> int \<Rightarrow> int" where
  "next_i v n = fst (hd (dropWhile (\<lambda>u. (fst u)\<le>n) v))"
 (*  "next_i (i#j#l) n = (if fst i=n then fst j else next_i (j#l) n)"*)
 
-definition find_block :: "int \<Rightarrow> vertex \<Rightarrow> bool" where
+definition find_block :: "int \<Rightarrow> (int * vertex) \<Rightarrow> bool" where
 "find_block n bl = (if n=fst bl then True else False)"
 
 fun good_dest :: "int \<Rightarrow> vertices \<Rightarrow> bool" where
@@ -73,9 +70,8 @@ definition concat_map :: "int \<Rightarrow> edge \<Rightarrow> edges_return \<Ri
 | (Incomplete (e1,d1,s1), Incomplete (e2,d2,s2)) \<Rightarrow> Incomplete ((e1 ++ e2)(n:= Some v),d1,s1)
 )"
 
-fun extract_indexes :: "vertices \<Rightarrow> int list" where
-  "extract_indexes [] = []"
-| "extract_indexes ((i,b)#a) = i # (extract_indexes a)"
+definition extract_indexes :: "vertices \<Rightarrow> int list" where
+"extract_indexes xs = map fst xs"
 
 definition deconstruct :: "edges_return \<Rightarrow> edges" where
 "deconstruct e = (case e of (Complete i) \<Rightarrow> i | (Incomplete (i,d,s)) \<Rightarrow> i)"
@@ -177,7 +173,7 @@ fun edges_blocks :: "int list \<Rightarrow> int \<Rightarrow> stack_value list \
         else not_complete (update_edges (edges_blocks new_to_do m (snd res) vertices) n (i, Some m)) ''Bad destination for JUMPI'' st))
 ))))))"
 
-definition build_cfg :: "inst list \<Rightarrow> cfg_" where
+definition build_cfg :: "inst list \<Rightarrow> cfg" where
 "build_cfg prog = (let blocks = build_basic_blocks prog in
 (let ind = (extract_indexes blocks) in
 (let edges = deconstruct (edges_blocks ind 0 [] blocks) in
@@ -204,7 +200,7 @@ theorem reverse_basic_blocks: "reconstruct_bytecode (build_basic_blocks i) = i"
 apply(simp add: rev_basic_blocks)
 done
 
-(* subsection {* Parameterize functions for cfg program *} *)
+(* subsection {* Build `position program` for a control flow graph *} *)
 
 definition empty_cfg  :: " position program "  where 
      " empty_cfg = ( (|
@@ -218,30 +214,44 @@ definition empty_cfg  :: " position program "  where
   program_zero = (0,0)
 |) )"
 
-(** TODO **)
 definition cfg_advance_pc :: "position \<Rightarrow> int \<Rightarrow> position" where
 "cfg_advance_pc = (\<lambda>(n,m). \<lambda>i. (n, m+i))"
 
-definition cfg_next_block :: "position \<Rightarrow> int \<Rightarrow> position" where
-"cfg_next_block= (\<lambda>(n,m). \<lambda>_. (n,m))"
+definition cfg_next_block :: "cfg \<Rightarrow> position \<Rightarrow> int \<Rightarrow> position" where
+"cfg_next_block c pos _ = (case cfg_edges c (fst pos) of
+  None \<Rightarrow> pos
+| Some (m,_) \<Rightarrow> (m,0)
+)"
 
 definition cfg_pc_as_int :: "position \<Rightarrow> int" where
 "cfg_pc_as_int = (\<lambda>(n,m). n + m)"
 
-definition cfg_pos_from_int :: "int \<Rightarrow> position" where
-"cfg_pos_from_int = (\<lambda>n. (n,0) )"
+definition cfg_pos_from_int :: "cfg \<Rightarrow> int \<Rightarrow> position" where
+"cfg_pos_from_int c n = (let rev_ind = rev (cfg_indexes c) in 
+  (case (dropWhile (\<lambda>u. u > n) rev_ind) of
+  [] \<Rightarrow> (0,0) (*Should not happen*)
+ |t#q \<Rightarrow> (t,n-t)
+ ))"
 
 definition cfg_zero :: "position" where
 "cfg_zero = (0,0)"
 
 definition cfg_length :: "cfg \<Rightarrow> int " where
-"cfg_length = (\<lambda>c. 0)"
+"cfg_length c = 
+  (case cfg_blocks c (last (cfg_indexes c)) of
+    None \<Rightarrow> 0 (*Should not happen*)
+  | Some (_,ys) \<Rightarrow> (let (n,m) = fst (last ys) in n + m))"
 
 definition cfg_content :: "cfg \<Rightarrow> position \<Rightarrow> inst option" where
-"cfg_content c = (\<lambda>(n,m). None)"
+"cfg_content c = (\<lambda>(n,m). 
+  (case cfg_blocks c n of
+    None \<Rightarrow> None
+  | Some (_,ys) \<Rightarrow> (case find (\<lambda>(pos,_). pos=(n,m)) ys of
+      None \<Rightarrow> None
+    | Some (_,i) \<Rightarrow> Some i )))"
 
 definition cfg_of_lst :: "cfg \<Rightarrow> position program " where
 "cfg_of_lst c = 
-  program_of_lst cfg_advance_pc cfg_next_block cfg_pc_as_int cfg_pos_from_int cfg_zero cfg_length cfg_content c"
+  prog_of_lst cfg_advance_pc (cfg_next_block c) cfg_pc_as_int (cfg_pos_from_int c) cfg_zero cfg_length cfg_content c"
 
 end
