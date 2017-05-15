@@ -1,7 +1,8 @@
 theory Hoare
 
 imports Main "../attic/CFG"
-
+ "../sep_algebra/EvmSep"
+ "../sep_algebra/Sep_Tactics"
 begin
 
 lemma not_at_least_one :
@@ -138,7 +139,7 @@ definition contexts_as_set :: "'a variable_ctx \<Rightarrow> 'a constant_ctx \<R
        constant_ctx_as_set c \<union> variable_ctx_as_set v"
 
 type_synonym 'b set_pred = "'b set \<Rightarrow> bool"
-
+(*
 (* From Magnus Myreen's thesis, Section 3.3 *)
 definition sep :: "'b set_pred \<Rightarrow> 'b set_pred \<Rightarrow> 'b set_pred"
   where
@@ -151,36 +152,38 @@ lemma sep_assoc [simp]: "((a ** b) ** c) = (a ** b ** c)"
 
 lemma sep_commute [simp]: "(a ** b)= (b ** a)"
   by (simp add: sep_def) blast
-
+*)
 lemma sep_lc [simp]: "(a ** b ** c) = (b ** a ** c)"
-using sep_assoc by force
+ by (simp add: sep_conj_ac)
 
-lemma sep_three : "c ** a ** b = a ** b ** c"
-by auto
+lemma sep_three : "(c ** a ** b) = (a ** b ** c)"
+ by (simp add: sep_conj_ac)
+
 
 definition emp :: "'a set_pred"
   where
-    "emp s == (s = {})"
+    "emp s == (s = 0)"
 
 lemma sep_emp [simp] :
-  "r ** emp = r"
-apply(simp add: emp_def sep_def)
-done
+  "(r ** emp) = r"
+  apply(simp add: emp_def  sep_conj_def)
+ done
 
-
+(*
 interpretation set_pred : comm_monoid
    "sep :: 'a set_pred \<Rightarrow> 'a set_pred \<Rightarrow> 'a set_pred"
    "emp :: 'a set_pred"
 apply(auto simp add: comm_monoid_def abel_semigroup_def semigroup_def abel_semigroup_axioms_def
       sep_three comm_monoid_axioms_def)
 done
-
+*)
+ (*
 definition pure :: "bool \<Rightarrow> 'a set_pred"
   where
     "pure b s == emp s \<and> b"
 
 notation pure ("\<langle> _ \<rangle>")
-
+*)
 definition memory_usage :: "int \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "memory_usage u s == (s = {MemoryUsageElm u})"
@@ -208,8 +211,16 @@ where
 lemma sep_logged [simp]:
   "(a ** logged n l) s =
    (LogElm (n, l) \<in> s \<and> a (s - {LogElm (n, l)}))"
-apply(auto simp add: sep_def logged_def)
-done
+  apply(auto simp add: sep_conj_def logged_def)
+    apply (fastforce simp: sep_set_conv)
+    apply (fastforce simp: sep_set_conv)
+  apply (rule_tac x="(s - {LogElm (n, l)})" in exI)
+  apply (rule conjI)
+    apply (simp add: sep_disj_set_def)
+  apply (rule conjI)
+   apply (simp add: insert_absorb plus_set_def)
+  apply assumption
+  done
 
 definition gas_pred :: "int \<Rightarrow> 'a state_element set \<Rightarrow> bool"
   where
@@ -222,7 +233,14 @@ definition gas_any :: "'a state_element set \<Rightarrow> bool"
 lemma gas_any_sep [simp] :
   "(gas_any ** rest) s =
    (\<exists> g. GasElm g \<in> s \<and> rest (s - {GasElm g}))"
-apply(auto simp add: gas_any_def sep_def)
+  apply(auto simp add: gas_any_def sep_conj_def)
+   apply (rule_tac x=g in exI)
+   apply (simp add: sep_set_conv)
+   apply (rule_tac x="{GasElm g}" in exI)
+  apply (rule_tac x="(s - {GasElm g})" in exI)
+  apply simp
+  apply (simp add: sep_set_conv)
+  apply blast
 done
 
 lemma sep_gas_any_sep [simp] :
@@ -230,13 +248,30 @@ lemma sep_gas_any_sep [simp] :
    (\<exists> g. GasElm g \<in> s \<and> (a ** rest) (s - {GasElm g}))"
 	by simp
 
+lemma sep_log_numberD:
+  "(log_number n \<and>* R) s \<Longrightarrow> LogNumElm n \<in> s"
+  by (clarsimp simp: sep_conj_def sep_set_conv log_number_def)
+
+lemma sep_log_numberI:
+  "LogNumElm n \<in> s \<Longrightarrow> R (s - {LogNumElm n}) \<Longrightarrow> (log_number n \<and>* R) s"
+  apply (clarsimp simp: sep_conj_def sep_set_conv log_number_def)
+  apply (rule_tac x="s - {LogNumElm n}" in exI)
+  apply blast
+ done
+    
+lemma sep_log_number_h_cancelD:
+  "(log_number n \<and>* R) s \<Longrightarrow> R (s - {LogNumElm n})"
+  by (clarsimp simp: sep_conj_def sep_set_conv log_number_def)
+
 lemma sep_log_number_sep [simp] :
   "(a ** log_number n ** b) s =
    (LogNumElm n \<in> s \<and> (a ** b) (s - {LogNumElm n}))
   "
-apply(auto simp add: log_number_def sep_def)
-done
-
+  apply(auto simp add: log_number_def )
+    apply (sep_drule  (direct) sep_log_numberD, assumption)
+   apply (sep_erule (direct) sep_log_number_h_cancelD)
+  apply (sep_rule (direct) sep_log_numberI, assumption+)
+ done
 
 definition caller :: "address \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
@@ -277,7 +312,7 @@ definition memory8 :: "w256 \<Rightarrow> byte \<Rightarrow> 'a state_element se
 where
 "memory8 idx v s == s = {MemoryElm (idx ,v)}"
 
-lemma memory8_sep [simp] :
+(*lemma memory8_sep [simp] :
 "(memory8 idx v ** rest) s = (MemoryElm (idx, v) \<in> s \<and> rest (s - {MemoryElm (idx, v)}))"
 apply(auto simp add: memory8_def sep_def)
 done
@@ -292,12 +327,12 @@ proof -
   ultimately show ?thesis
     by auto
 qed
-
+*)
 
 fun memory_range :: "w256 \<Rightarrow> byte list \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
   "memory_range begin [] = emp"
-| "memory_range begin (h # t) = memory8 begin h ** memory_range (begin + 1) t"
+| "memory_range begin (h # t) = (memory8 begin h ** memory_range (begin + 1) t)"
 
 fun memory_range_elms :: "w256 \<Rightarrow> byte list \<Rightarrow> 'a state_element set"
 where
@@ -316,6 +351,7 @@ done
 
 (* prove a lemma about the above two definitions *)
 
+(*
 lemma stack_sound0 :
   "(stack pos w ** p) s \<Longrightarrow> StackElm (pos, w) \<in> s"
 apply(auto simp add: sep_def stack_def)
@@ -335,7 +371,7 @@ lemma stack_sem :
   apply(drule stack_sound1)
   apply(simp)
   done
-
+*)
 definition instruction_result_as_set :: "'a constant_ctx \<Rightarrow> 'a instruction_result \<Rightarrow> 'a state_element set"
   where
     "instruction_result_as_set c rslt =
@@ -394,11 +430,13 @@ lemma no_assertion_pass [simp] : "no_assertion co_ctx \<Longrightarrow> check_an
 apply(simp add: no_assertion_def check_annotations_def)
 done
 
-lemma pure_sep [simp] : "(\<langle> b \<rangle> ** rest) s = (b \<and> rest s)"
-apply(auto simp add: sep_def pure_def emp_def)
-done
+lemma pure_sep [simp] : "(((\<langle> b \<rangle>) ** rest) s) = (b \<and> rest s)"
+  apply( simp add: sep_conj_def pure_def emp_def )
+  apply (rule iffI)
+   apply clarsimp
+  oops
 
-lemma contiuning_sep [simp] :
+(*mma contiuning_sep [simp] :
   "(continuing ** rest) s = ((ContinuingElm True) \<in> s \<and> rest (s - {ContinuingElm True}))"
 apply(auto simp add: sep_def continuing_def)
 done
@@ -630,8 +668,10 @@ declare memory_as_set_def [simp]
  ** Inference rules about Hoare triples
  ** Following Magnus Myreen's thesis, 3.5
  **)
-lemma code_diff_union : "code (a \<union> b) = code a ** (code (b - a))"
- by (rule ext) (auto simp: code_def sep_def)
+lemma code_diff_union : "(code (a \<union> b)) = (code a ** (code (b - a)))"
+  apply (rule ext) 
+  apply (auto simp: code_def )
+    oops
 
 lemma code_middle:
   "(p ** code (c_1 \<union> c_2) ** rest) =
@@ -647,7 +687,7 @@ lemma shuffle3:
   "(p ** (code c_1 ** code (c_2 - c_1)) ** rest) =
    (p ** code c_1 ** (code (c_2 - c_1) ** rest))"
   by (simp add: sep_def) blast
-
+*)
 
 lemma execution_continue [simp]:
   "\<forall> presult. (program_sem s co_ctx a (program_sem s co_ctx b presult) = program_sem s co_ctx (b + a) presult)"
@@ -672,7 +712,7 @@ apply(simp)
 apply(drule_tac x = s in spec)
 apply(simp)
 done
-
+(*
 lemma code_back:
   "(q ** code c_1 ** code (c_2 - c_1) ** rest) s = (q ** code (c_1 \<union> c_2) ** rest) s"
 apply(simp only: code_middle shuffle3)
@@ -723,12 +763,13 @@ lemma frame:
   apply (drule spec2[where x=presult and y="R ** rest"])
   apply (simp)
   done
- done
+ done*)
+
 
 lemma imp_sepL:
   "(\<forall>s. a s \<longrightarrow> b s) \<Longrightarrow>
    (\<forall>s. (a ** c) s \<longrightarrow> (b ** c) s)"
- by (auto simp add: sep_def)
+  by (auto simp add: sep_conj_def)
 
 lemma weaken_post:
   "triple F P c Q \<Longrightarrow> (\<forall>s. Q s \<longrightarrow> R s) \<Longrightarrow> triple F P c R"
@@ -745,7 +786,7 @@ lemma weaken_post:
   apply fastforce
   done
  done
-
+(*
 lemma strengthen_pre:
   "triple F P c Q \<Longrightarrow> (\<forall>s. R s \<longrightarrow> P s) \<Longrightarrow> triple F R c Q"
  apply (simp add: triple_def)
@@ -961,7 +1002,7 @@ where
 "
 
 declare sep_sep_code [simp]
-
+*)
 (* example of if_then_else *)
 
 (* loop *)

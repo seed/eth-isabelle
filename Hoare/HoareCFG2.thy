@@ -1,7 +1,6 @@
 theory "HoareCFG2"
 
 imports "Hoare"
-
 begin
 type_synonym position = "int * int"
 type_synonym pred = "(position state_element set \<Rightarrow> bool)"
@@ -124,7 +123,10 @@ apply(rule all_continue)
 apply(rule one_jump[where m=4 and h="Suc 0" and a="1000 - 2 * Gverylow" and x="word_rcat [6]"
     and rest="stack 0 (word_rcat [1])"])
  apply(simp)
- apply(simp)
+    apply(simp)
+   apply (clarsimp simp add: cfg_triple_def)
+    apply (sep_select 3)
+    apply (sep_select_asm 3)
 defer
 apply(rule all_end[where n=6])
  apply(simp)
