@@ -43,8 +43,8 @@ abbreviation (input)
   "a imp b \<equiv> \<lambda>s. a s \<longrightarrow> b s"
 
 abbreviation (input)
-  pred_K :: "'b \<Rightarrow> 'a \<Rightarrow> 'b" ("\<langle>_\<rangle>") where
-  "\<langle>f\<rangle> \<equiv> \<lambda>s. f"
+  pred_K :: "'b \<Rightarrow> 'a \<Rightarrow> 'b" ("\<langle>\<langle>_\<rangle>\<rangle>") where
+  "\<langle>\<langle>f\<rangle>\<rangle> \<equiv> \<lambda>s. f"
 
 abbreviation (input)
   pred_ex :: "('b \<Rightarrow> 'a \<Rightarrow> bool) \<Rightarrow> 'a \<Rightarrow> bool" (binder "EXS " 10) where
@@ -130,10 +130,10 @@ definition
 (* We want these to be abbreviations not definitions, because basic True and
    False will occur by simplification in sep_conj terms *)
 abbreviation
-  "sep_true \<equiv> \<langle>True\<rangle>"
+  "sep_true \<equiv> \<langle>\<langle>True\<rangle>\<rangle>"
 
 abbreviation
-  "sep_false \<equiv> \<langle>False\<rangle>"
+  "sep_false \<equiv> \<langle>\<langle>False\<rangle>\<rangle>"
 
 
 subsection {* Disjunction/Addition Properties *}
@@ -456,17 +456,17 @@ lemma pure_impl_sep_impl:
   "\<lbrakk> P h \<longrightarrow> Q h; pure P; pure Q \<rbrakk> \<Longrightarrow> (P \<longrightarrow>* Q) h"
   by (force simp: pure_split)
 
-lemma pure_conj_right: "(Q \<and>* (\<langle>P'\<rangle> and Q')) = (\<langle>P'\<rangle> and (Q \<and>* Q'))"
+lemma pure_conj_right: "(Q \<and>* (\<langle>\<langle>P'\<rangle>\<rangle> and Q')) = (\<langle>\<langle>P'\<rangle>\<rangle> and (Q \<and>* Q'))"
   by (rule ext, rule, rule, clarsimp elim!: sep_conjE)
      (erule sep_conj_impl, auto)
 
-lemma pure_conj_right': "(Q \<and>* (P' and \<langle>Q'\<rangle>)) = (\<langle>Q'\<rangle> and (Q \<and>* P'))"
+lemma pure_conj_right': "(Q \<and>* (P' and \<langle>\<langle>Q'\<rangle>\<rangle>)) = (\<langle>\<langle>Q'\<rangle>\<rangle> and (Q \<and>* P'))"
   by (simp add: conj_comms pure_conj_right)
 
-lemma pure_conj_left: "((\<langle>P'\<rangle> and Q') \<and>* Q) = (\<langle>P'\<rangle> and (Q' \<and>* Q))"
+lemma pure_conj_left: "((\<langle>\<langle>P'\<rangle>\<rangle> and Q') \<and>* Q) = (\<langle>\<langle>P'\<rangle>\<rangle> and (Q' \<and>* Q))"
   by (simp add: pure_conj_right sep_conj_ac)
 
-lemma pure_conj_left': "((P' and \<langle>Q'\<rangle>) \<and>* Q) = (\<langle>Q'\<rangle> and (P' \<and>* Q))"
+lemma pure_conj_left': "((P' and \<langle>\<langle>Q'\<rangle>\<rangle>) \<and>* Q) = (\<langle>\<langle>Q'\<rangle>\<rangle> and (P' \<and>* Q))"
   by (subst conj_comms, subst pure_conj_left, simp)
 
 lemmas pure_conj = pure_conj_right pure_conj_right' pure_conj_left

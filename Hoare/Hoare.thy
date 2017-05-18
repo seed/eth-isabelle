@@ -178,13 +178,13 @@ apply(auto simp add: comm_monoid_def abel_semigroup_def semigroup_def abel_semig
       sep_three comm_monoid_axioms_def)
 done
 *)
- (*
+
 definition pure :: "bool \<Rightarrow> 'a set_pred"
   where
     "pure b s == emp s \<and> b"
 
 notation pure ("\<langle> _ \<rangle>")
-*)
+
 definition memory_usage :: "int \<Rightarrow> 'a state_element set \<Rightarrow> bool"
 where
 "memory_usage u s == (s = {MemoryUsageElm u})"
@@ -457,10 +457,7 @@ apply(simp add: no_assertion_def check_annotations_def)
 done
 
 lemma pure_sep [simp] : "(((\<langle> b \<rangle>) ** rest) s) = (b \<and> rest s)"
-  apply( simp add: sep_conj_def pure_def emp_def )
-  apply (rule iffI)
-   apply clarsimp
-  oops
+  by ( simp add: sep_conj_def pure_def emp_def )
 
 lemma contiuning_sep [simp] :
   "(continuing ** rest) s = ((ContinuingElm True) \<in> s \<and> rest (s - {ContinuingElm True}))"
@@ -724,44 +721,24 @@ declare sep_sep_code [simp del]
 lemma set_compr_disj_union:
   "{T x| x.  P x \<or> Q x} = {T x | x. P x} \<union> { T x | x. Q x}"
   by blast
-    
+
 lemma set_compr_double_disj_union:
   "{T x y| x y.  P x y \<or> Q x y} = {T x y | x y. P x y} \<union> { T x y | x y. Q x y}"
   by blast
 
+lemma set_compr_double_neg_subseteq:
+ "{T x y |x y. Q x y} \<subseteq> x \<Longrightarrow>
+  {T x y |x y. P x y \<and> \<not> Q x y} \<subseteq> x - {T x y |x y. Q x y} \<Longrightarrow>
+  {T x y | x y. P x y \<or> Q x y} \<subseteq> x"
+  by blast
+
 lemma composition:
   "c = cL \<union> cR \<Longrightarrow> triple F P cL Q \<Longrightarrow> triple F Q cR R \<Longrightarrow> triple F P c R"
-apply(auto simp add: triple_def code_middle shuffle3)
-apply(drule_tac x = "co_ctx" in spec; simp)
-apply(drule_tac x = "presult" in spec)
-apply(drule_tac x = co_ctx in spec; simp)
-apply(drule_tac x = "code (cR - cL) ** rest" in spec; simp add: code_more)
-apply(drule_tac x = stopper in spec)
-apply(erule exE)
-apply(auto)
-apply(drule_tac x = "program_sem stopper co_ctx k presult" in spec)
-apply(drule_tac x = "code (cL - cR) ** rest" in spec)
-  apply(simp add: code_more code_union_comm)
-  apply (erule impE)
-   apply (rule conjI)
-  defer
-  apply (rule conjI)
-     apply blast
-    apply (erule_tac P="Q \<and>* rest" in back_subst)
-    apply blast
-    
- apply(drule_tac x = stopper in spec)
-apply(erule exE)
-apply(rule_tac x = "k + ka" in exI, clarsimp)
-  apply (rule conjI)
-  defer
-    apply (rule conjI)
-sorry  
-   (*
   apply (simp (no_asm) add: triple_def)
   apply clarsimp
   apply (subst (asm) triple_def[where pre=P])
   apply clarsimp
+  apply (rename_tac co_ctx presult rest stopper)
   apply(drule_tac x = "co_ctx" in spec, simp)
   apply(drule_tac x = "presult" in spec)
   apply(drule_tac x = "code (cR - cL) ** rest" in spec; simp add: code_more)
@@ -776,33 +753,30 @@ sorry
   apply(drule_tac x = "co_ctx" in spec, simp)
   apply(drule_tac x = "program_sem stopper co_ctx k presult" in spec)
   apply(drule_tac x = "code (cL - cR) ** rest" in spec)
-  apply(simp add: code_more code_union_comm)
   apply (erule disjE)
+   prefer 2
+   apply auto[1]
+  apply clarsimp
   apply (erule impE)
-    apply clarsimp
     apply (rule conjI, blast)+
-    apply (erule_tac P="Q\<and>* rest" in back_subst)
+    apply (erule_tac P="Q \<and>* rest" in back_subst)
     apply blast
    apply(drule_tac x = stopper in spec)
    apply clarsimp
-   apply (erule disjE)
-   apply clarsimp
-    apply(rule_tac x = "k + ka" in exI)
-    apply (rule disjI1)
-    apply (rule conjI)
-     apply (simp only: set_compr_double_disj_union)
-     apply (rule Un_least)
-  defer
-      apply blast
-     apply (erule_tac P="R \<and>* rest" in back_subst)
-     apply blast
-    apply (rule_tac x=k in exI)
-    
-    apply (rule conjI)
-       apply clarsimp
-    apply auto[1]
-done*)
-
+  apply (erule disjE)
+   prefer 2
+   apply auto[1]
+  apply clarsimp
+  apply (rename_tac k m)
+  apply(rule_tac x = "k + m" in exI)
+  apply (rule disjI1)
+  apply (rule conjI)
+   apply (thin_tac "(_ \<and>* _) _")+
+   apply (thin_tac "_ \<subseteq> instruction_result_as_set co_ctx presult")
+   apply (erule (1) set_compr_double_neg_subseteq)
+  apply (erule back_subst[where P="R \<and>* _"])
+  apply blast
+ done
 (** Frame **)
 
 lemma frame:
@@ -839,71 +813,67 @@ lemma weaken_post:
   apply (fastforce)
   done
  done
-(*
-lemma strengthen_pre:
-  "triple F P c Q \<Longrightarrow> (\<forall>s. R s \<longrightarrow> P s) \<Longrightarrow> triple F R c Q"
- apply (simp add: triple_def)
- apply(clarify)
- apply(drule_tac x = co_ctx in spec)
- apply(simp)
- apply(drule_tac x = presult in spec)
- apply(drule_tac x = rest in spec)
- apply(subgoal_tac "(rest ** P ** code c) (instruction_result_as_set co_ctx presult)")
-  apply(simp)
- apply(simp add: sep_def)
- apply(erule_tac exE)
- apply(rule_tac x = u in exI)
- apply(rule conjI)
-  apply(simp)
- apply(erule conjE)
- apply(erule_tac exE)
- apply(rule_tac x = v in exI)
- apply(rule conjI; simp?)
- apply(erule conjE)
- apply(erule exE)
- apply(rule_tac x = ua in exI)
- apply(auto)
-done
 
+lemma strengthen_pre:
+  assumes  "triple F P c Q"
+  and      "(\<forall>s. R s \<longrightarrow> P s)"
+  shows" triple F R c Q"
+  using assms(1)
+  apply (simp add: triple_def)
+  apply(clarify)
+  apply(drule_tac x = co_ctx in spec)
+  apply(simp)
+  apply(drule_tac x = presult in spec)
+  apply(drule_tac x = rest in spec)
+  apply simp
+  apply (erule impE)
+   apply (sep_drule assms(2)[rule_format])
+   apply assumption
+  apply simp
+ done
 
 lemma frame_backward:
   "triple F P c Q \<Longrightarrow> P' = (P ** R) \<Longrightarrow> Q' = (Q ** R) \<Longrightarrow>
    triple F P' c Q'"
   by (simp add: frame)
 
+text \<open>the \<langle>P\<rangle> of abstract algebra is different from pure of Magnus,
+      causes several incompatibilities. The following lemma appears
+      to be false :/ \<close>
 lemma remove_true:
- "(p ** \<langle> True \<rangle> ** rest) s = (p ** rest) s"
-apply(simp add: sep_def pure_def emp_def)
-done
-
+ "(p ** \<langle>True\<rangle> ** rest) = (p ** rest)"
+ by (simp add: pure_def sep_conj_def emp_def)
+    
 lemma sep_true [simp] :
-  "p ** \<langle> True \<rangle> = p"
-apply(simp add: sep_def pure_def emp_def)
-done
+  "(p ** \<langle>True\<rangle>) = p"
+ by (simp add: pure_def sep_conj_def emp_def)
 
 lemma move_pure0 :
-  "triple reasons (p ** \<langle> True \<rangle>) c q \<Longrightarrow> b \<Longrightarrow> triple reasons p c q"
+  "triple reasons (p ** \<langle> True \<rangle>) c q \<Longrightarrow>  triple reasons p c q"
 apply(simp add: triple_def remove_true)
 done
 
 lemma false_triple [simp] :
   "triple reasons (p ** \<langle> False \<rangle>) c q"
-apply(simp add: triple_def sep_def pure_def)
+apply(simp add: triple_def sep_basic_simps pure_def)
 done
 
 lemma get_pure [simp]:
   "((p ** \<langle> b \<rangle> ** rest) s) = (b \<and> (p ** rest) s)"
-apply(auto simp add: sep_def pure_def emp_def)
+apply(auto simp add: sep_basic_simps pure_def emp_def)
 done
 
 lemma move_pure [simp]: "triple reaons (p ** \<langle> b \<rangle>) c q = (b \<longrightarrow> triple reaons p c q)"
 apply(auto simp add: move_pure0)
 apply(case_tac b; auto)
-done
+  done
 
+lemma pure_sepD:
+  "(\<langle>P\<rangle> ** R) s \<Longrightarrow> R s"
+  by (simp add: pure_def emp_def sep_basic_simps)
+    
 lemma move_pureL [simp]: "triple reaons (\<langle> b \<rangle> ** p) c q = (b \<longrightarrow> triple reaons p c q)"
-apply(auto simp add: move_pure0)
-done
+ by (metis move_pure sep_conj_commute)
 
 lemma tmp01:
     "(rest ** code c ** p x) (case presult of InstructionContinue v \<Rightarrow> contexts_as_set v co_ctx | _ \<Rightarrow> {}) \<Longrightarrow>
@@ -926,36 +896,46 @@ apply(drule_tac x = presult in spec)
 apply(drule_tac x = rest in spec)
 apply(subgoal_tac "(rest ** code c ** (\<lambda>s. \<exists>x. p x s))
      (case presult of InstructionContinue v \<Rightarrow> contexts_as_set v co_ctx | _ \<Rightarrow> {})")
- apply(simp)
+   apply(simp)
+    (*
 apply(rule tmp01)
 apply(simp)
-done
+done*)
+    oops
 
 declare sep_code_sep [simp]
 
 lemma preE0:
   "((\<lambda>s. \<exists>x. p x s) ** code c ** rest) s \<Longrightarrow>
    \<exists> x. (p x ** code c ** rest) s"
-apply(auto simp only: sep_def)
+apply(auto simp only: sep_basic_simps)
 	by blast
 
 lemma sep_impL :
  "\<forall> s. b s \<longrightarrow> a s \<Longrightarrow> 
  (c ** b ** d) s \<longrightarrow>
  (c ** a ** d) s"
-  by (metis sep_def)
+  by (metis sep_basic_simps)
 
 
 lemma pre_imp:
-  "\<forall> s. (b s \<longrightarrow> a s) \<Longrightarrow> triple reasons a c q \<Longrightarrow> triple reasons b c q"
+ assumes "\<forall> s. (b s \<longrightarrow> a s)"
+ and " triple reasons a c q"
+shows" triple reasons b c q"
+using assms(2)
 apply(auto simp add: triple_def)
 apply(drule_tac x = co_ctx in spec)
 apply(auto)
 apply(drule_tac x = presult in spec)
-apply(drule_tac x = rest in spec)
+  apply(drule_tac x = rest in spec)
+  apply (erule impE)
+    apply (sep_drule  assms(1)[rule_format])
+    apply blast
 apply(subgoal_tac "(rest ** a ** code c) (instruction_result_as_set co_ctx presult)")
- apply(simp)
-apply(simp add: sep_impL)
+  apply(simp )
+apply(simp add: sep_impL[OF assms(1)])
+  apply (sep_drule  assms(1)[rule_format])
+  apply auto
 done
 
 lemma preE1 [simp]:
