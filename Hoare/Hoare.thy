@@ -923,36 +923,34 @@ lemma pre_imp:
  and " triple reasons a c q"
 shows" triple reasons b c q"
 using assms(2)
-apply(auto simp add: triple_def)
-apply(drule_tac x = co_ctx in spec)
-apply(auto)
-apply(drule_tac x = presult in spec)
+  apply(auto simp add: triple_def)
+  apply(drule_tac x = co_ctx in spec)
+  apply(auto)
+  apply(drule_tac x = presult in spec)
   apply(drule_tac x = rest in spec)
   apply (erule impE)
-    apply (sep_drule  assms(1)[rule_format])
-    apply blast
-apply(subgoal_tac "(rest ** a ** code c) (instruction_result_as_set co_ctx presult)")
-  apply(simp )
-apply(simp add: sep_impL[OF assms(1)])
-  apply (sep_drule  assms(1)[rule_format])
-  apply auto
-done
+   apply (sep_drule  assms(1)[rule_format])
+   apply blast
+  apply(subgoal_tac "(rest ** a ** code c) (instruction_result_as_set co_ctx presult)")
+   apply(simp )
+  apply (sep_rule sep_impL[OF assms(1), rule_format])
+  apply(simp)
+ done
 
 lemma preE1 [simp]:
 "((\<lambda>s. \<exists>x. p x s) ** rest) u
 =
 (\<exists> x. (p x ** rest) u)
 "
-apply(auto simp add: sep_def)
+apply(auto simp add: sep_basic_simps)
 done
 
 lemma preE00:
   "(rest ** code c ** p x) s \<Longrightarrow>
    (rest ** code c ** (\<lambda>s. \<exists>x. p x s)) s"
-apply(auto simp add: sep_def)
-apply(rule_tac x = u in exI)
-apply blast
-done
+  apply (sep_cancel)+
+  apply blast
+ done
 
 declare sep_code_sep [simp del]
 
@@ -961,23 +959,16 @@ apply(auto simp add: triple_def)
  apply(erule_tac x = co_ctx in allE)
  apply simp
  apply(drule_tac x = presult in spec)
- apply(drule_tac x = rest in spec)
+  apply(drule_tac x = rest in spec)
+  apply (erule impE)
+   apply blast
  apply(subgoal_tac "(rest ** code c ** (\<lambda>s. \<exists>x. p x s)) (instruction_result_as_set co_ctx presult)")
+   apply(simp)
+  apply(rule_tac x=x in preE00)
   apply(simp)
- apply(rule preE00)
- apply(simp)
-apply(auto simp add: sep_def)
-apply(drule_tac x = x in spec)
-apply(drule_tac x = co_ctx in spec)
-apply(simp)
-apply(drule_tac x = presult in spec)
-apply(drule_tac x = rest in  spec)
-apply(subgoal_tac "(\<exists>u. rest u \<and>
-            (\<exists>v. (\<exists>u. code c u \<and> (\<exists>va. p x va \<and> u \<union> va = v \<and> u \<inter> va = {})) \<and>
-                 u \<union> v = instruction_result_as_set co_ctx presult \<and> u \<inter> v = {}))")
- apply(simp)
-apply(rule_tac x = u in exI)
-apply(auto)
+  apply (sep_select 2)
+  apply (subst code_sep)
+  apply (simp add: sep_conj_ac)
 done
 
 declare sep_code_sep [simp]
@@ -1035,7 +1026,6 @@ where
 "
 
 declare sep_sep_code [simp]
-*)
 (* example of if_then_else *)
 
 (* loop *)
