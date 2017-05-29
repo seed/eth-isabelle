@@ -53,7 +53,6 @@ datatype 'a state_element =
   | DifficultyElm "w256"
   | GaslimitElm "w256"
   | GaspriceElm "w256"
-  | BlockTypeElm "tblock"
 
 abbreviation blockhash_as_elm :: "(w256 \<Rightarrow> w256) \<Rightarrow> 'a state_element set"
 where "blockhash_as_elm f == { BlockhashElm (n, h) | n h. f n = h}"
@@ -323,6 +322,17 @@ where
 lemma memory8_sep [simp] :
  "(memory8 idx v ** rest) s = (MemoryElm (idx, v) \<in> s \<and> rest (s - {MemoryElm (idx, v)}))"
  by (solve_sep_iff simp: memory8_def)
+
+lemma sep_memory8_sep [simp] :
+"(a ** memory8 idx v ** rest) s = (MemoryElm (idx, v) \<in> s \<and> (a ** rest) (s - {MemoryElm (idx, v)}))"
+proof -
+  have "(a ** memory8 idx v ** rest) s = (memory8 idx v ** a ** rest) s"
+    by auto
+  moreover have "(memory8 idx v ** a ** rest) s = (MemoryElm (idx, v) \<in> s \<and> (a ** rest) (s - {MemoryElm (idx, v)}))"
+    by (rule memory8_sep)
+  ultimately show ?thesis
+    by auto
+qed
 
 text \<open> Following memory8_* lemmas are only there for backward compatibility, should be probably be removed \<close>
 lemma memory8_sepD:
