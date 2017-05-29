@@ -1,6 +1,6 @@
 theory "CFG"
 
-imports "../lem/Evm" "Parse"
+imports "../lem/Evm"
 
 begin
 (* Types definitions *)
@@ -9,11 +9,10 @@ Next | Jump | Jumpi | No
 
 type_synonym position = "int *int"
 type_synonym pos_inst = "position * inst"
-type_synonym vertex = "tblock * pos_inst list"
-type_synonym vertices = "(int * vertex) list"
+type_synonym vertex = "int * pos_inst list * tblock"
+type_synonym vertices = "vertex list"
 type_synonym edge = "int * (int option)"
 type_synonym edges = "int \<Rightarrow> edge option"
-
 
 datatype stack_value =
 Value "int" | Data
@@ -31,26 +30,29 @@ cfg_edges :: "edges"
 
 (* Auxiliary functions *)
 
+abbreviation v_ind :: "vertex \<Rightarrow> int" where
+"v_ind v == fst v"
+
+abbreviation v_ty :: "vertex \<Rightarrow> tblock" where
+"v_ty v == snd (snd v)"
+
+abbreviation v_insts :: "vertex \<Rightarrow> pos_inst list" where
+"v_insts v == fst (snd v)"
+
 definition byteListInt :: "8 word list \<Rightarrow> int" where
 "byteListInt l = uint ((word_rcat l):: 32 word)"
 
-abbreviation scnd :: "'a * 'b * 'c \<Rightarrow> 'b" where
-"scnd v == fst (snd v)"
-
-abbreviation thrd :: "'a * 'b * 'c \<Rightarrow> 'c" where
-"thrd v == snd (snd v)"
-
-fun next_i :: "vertices \<Rightarrow> int \<Rightarrow> int" where
- "next_i v n = fst (hd (dropWhile (\<lambda>u. (fst u)\<le>n) v))"
+definition next_i :: "vertices \<Rightarrow> int \<Rightarrow> int" where
+ "next_i v n = v_ind (hd (dropWhile (\<lambda>u. (v_ind u)\<le>n) v))"
 (*  "next_i (i#j#l) n = (if fst i=n then fst j else next_i (j#l) n)"*)
 
-definition find_block :: "int \<Rightarrow> (int * vertex) \<Rightarrow> bool" where
-"find_block n bl = (if n=fst bl then True else False)"
+definition find_block :: "int \<Rightarrow> vertex \<Rightarrow> bool" where
+"find_block n bl = (if n=v_ind bl then True else False)"
 
 fun good_dest :: "int \<Rightarrow> vertices \<Rightarrow> bool" where
   "good_dest m [] = False"
-| "good_dest m ((n,_,[])#l) = good_dest m l"
-| "good_dest m ((n,_, (_,i)#inst)#l) = (if m = n then (if i = Pc JUMPDEST then True else False) else good_dest m l )"
+| "good_dest m ((n,[],_)#l) = good_dest m l"
+| "good_dest m ((n,(_,i)#inst,_)#l) = (if m = n then (if i = Pc JUMPDEST then True else False) else good_dest m l )"
 
 fun not_complete :: "edges_return \<Rightarrow> char list \<Rightarrow> stack_value list\<Rightarrow> edges_return " where
   "not_complete (Complete edges) debug st= Incomplete (edges,debug,st)"
@@ -71,7 +73,7 @@ definition concat_map :: "int \<Rightarrow> edge \<Rightarrow> edges_return \<Ri
 )"
 
 definition extract_indexes :: "vertices \<Rightarrow> int list" where
-"extract_indexes xs = map fst xs"
+"extract_indexes xs = map v_ind xs"
 
 definition deconstruct :: "edges_return \<Rightarrow> edges" where
 "deconstruct e = (case e of (Complete i) \<Rightarrow> i | (Incomplete (i,d,s)) \<Rightarrow> i)"
@@ -104,20 +106,20 @@ value "stack_dup [Value 1, Value 2, Value 3, Value 4] 2"
 (* The execution of a basic block must be sequential. *)
 (* We remove JUMP and JUMPI instructions and cut after them or a stopping instrction *)
 (* and before a Jump destination. *)
-fun aux_basic_block :: "inst list \<Rightarrow> int \<Rightarrow> int \<Rightarrow> ((int*int)*inst) list \<Rightarrow> vertices" where
+fun aux_basic_block :: "inst list \<Rightarrow> int \<Rightarrow> int \<Rightarrow> pos_inst list \<Rightarrow> vertices" where
  "aux_basic_block [] pointer block_pt block = (if block = [] then [] else
-    [(block_pt, No, rev block)])"
+    [(block_pt, rev block, No)])"
 |"aux_basic_block ((i)#tl1) pointer block_pt block = 
   (let newpointer = pointer + (inst_size i) in
   (let pos = (block_pt, pointer - block_pt) in
   (case i of
     Pc JUMPDEST \<Rightarrow> (if block = [] then (aux_basic_block tl1 newpointer pointer [((pointer,0),i)])
-    else (block_pt, Next, rev block) # (aux_basic_block tl1 newpointer pointer [((pointer,0),i)]))
-  | Pc JUMP \<Rightarrow>(block_pt, Jump, rev block) # ( aux_basic_block tl1 newpointer newpointer [])
-  | Pc JUMPI \<Rightarrow>(block_pt, Jumpi, rev block) # ( aux_basic_block tl1 newpointer newpointer [])
-  | Misc RETURN \<Rightarrow>(block_pt, No, rev ((pos,i)#block)) # ( aux_basic_block tl1 newpointer newpointer [])
-  | Misc SUICIDE \<Rightarrow>(block_pt, No, rev ((pos,i)#block)) # ( aux_basic_block tl1 newpointer newpointer [])
-  | Misc STOP \<Rightarrow>(block_pt, No, rev ((pos,i)#block)) # ( aux_basic_block tl1 newpointer newpointer [])
+    else (block_pt, rev block, Next) # (aux_basic_block tl1 newpointer pointer [((pointer,0),i)]))
+  | Pc JUMP \<Rightarrow>(block_pt, rev block, Jump) # ( aux_basic_block tl1 newpointer newpointer [])
+  | Pc JUMPI \<Rightarrow>(block_pt, rev block, Jumpi) # ( aux_basic_block tl1 newpointer newpointer [])
+  | Misc RETURN \<Rightarrow>(block_pt, rev ((pos,i)#block), No) # ( aux_basic_block tl1 newpointer newpointer [])
+  | Misc SUICIDE \<Rightarrow>(block_pt, rev ((pos,i)#block), No) # ( aux_basic_block tl1 newpointer newpointer [])
+  | Misc STOP \<Rightarrow>(block_pt, rev ((pos,i)#block), No) # ( aux_basic_block tl1 newpointer newpointer [])
   | _ \<Rightarrow> aux_basic_block tl1 newpointer block_pt ((pos,i)#block))))"
 
 abbreviation build_basic_blocks :: "inst list \<Rightarrow> vertices" where
@@ -159,7 +161,7 @@ fun edges_blocks :: "int list \<Rightarrow> int \<Rightarrow> stack_value list \
   | True \<Rightarrow> (let block = find (find_block n) vertices in (case block of
         None \<Rightarrow> Incomplete (Map.empty, ''Block not found'',st)
       | Some bl \<Rightarrow>
-      (let res = edge_one_block (scnd bl) (thrd bl) st in (case fst res of
+      (let res = edge_one_block (v_ty bl) (v_insts bl) st in (case fst res of
         UNDEFINED s \<Rightarrow> Incomplete (Map.empty, s, st)
       | NONE \<Rightarrow> Complete Map.empty
       | NEXT \<Rightarrow> (let m = next_i vertices n in
@@ -178,7 +180,7 @@ definition build_cfg :: "inst list \<Rightarrow> cfg" where
 (let ind = (extract_indexes blocks) in
 (let edges = deconstruct (edges_blocks ind 0 [] blocks) in
 (|cfg_indexes = ind,
-cfg_blocks = map_of blocks,
+cfg_blocks = map_of (map (\<lambda>(n,i,t). (n,n,i,t)) blocks),
 cfg_edges = edges |)
 )))"
 
@@ -187,9 +189,9 @@ cfg_edges = edges |)
 (* Check that we can rebuild the initial list of instructions from basic blocks *)
 fun reconstruct_bytecode :: "vertices \<Rightarrow> inst list" where
  "reconstruct_bytecode [] = []"
-| "reconstruct_bytecode ((n,Jump,b)#q) = (map snd b)@[Pc JUMP] @ (reconstruct_bytecode q)" 
-| "reconstruct_bytecode ((n,Jumpi,b)#q) = (map snd b)@[Pc JUMPI] @ (reconstruct_bytecode q)" 
-| "reconstruct_bytecode ((n,_,b)#q) = (map snd b) @ (reconstruct_bytecode q)" 
+| "reconstruct_bytecode ((n,b,Jump)#q) = (map snd b)@[Pc JUMP] @ (reconstruct_bytecode q)" 
+| "reconstruct_bytecode ((n,b,Jumpi)#q) = (map snd b)@[Pc JUMPI] @ (reconstruct_bytecode q)" 
+| "reconstruct_bytecode ((n,b,_)#q) = (map snd b) @ (reconstruct_bytecode q)" 
 
 lemma rev_basic_blocks: "reconstruct_bytecode (aux_basic_block i p bp b) = (map snd (rev b))@i"
 apply(induction i arbitrary: p bp b)
@@ -240,18 +242,20 @@ definition cfg_length :: "cfg \<Rightarrow> int " where
 "cfg_length c = 
   (case cfg_blocks c (last (cfg_indexes c)) of
     None \<Rightarrow> 0 (*Should not happen*)
-  | Some (_,ys) \<Rightarrow> (let (n,m) = fst (last ys) in n + m))"
+  | Some (_,i,Jump) \<Rightarrow> (let (n,m) = fst (last i) in n + m + 1)
+  | Some (_,i,Jumpi) \<Rightarrow> (let (n,m) = fst (last i) in n + m + 1)
+  | Some (_,i,_) \<Rightarrow> (let (n,m) = fst (last i) in n + m ))"
 
 definition cfg_content :: "cfg \<Rightarrow> position \<Rightarrow> inst option" where
 "cfg_content c = (\<lambda>(n,m). 
   (case cfg_blocks c n of
     None \<Rightarrow> None
-  | Some (_,ys) \<Rightarrow> (case find (\<lambda>(pos,_). pos=(n,m)) ys of
+  | Some b \<Rightarrow> (case find (\<lambda>(pos,_). pos=(n,m)) (v_insts b) of
       None \<Rightarrow> None
     | Some (_,i) \<Rightarrow> Some i )))"
 
-definition cfg_of_lst :: "cfg \<Rightarrow> position program " where
-"cfg_of_lst c = 
-  prog_of_lst cfg_advance_pc (cfg_next_block c) cfg_pc_as_int (cfg_pos_from_int c) cfg_zero cfg_length cfg_content c"
+definition program_of_cfg :: "cfg \<Rightarrow> position program " where
+"program_of_cfg c = 
+  program_of_lst cfg_advance_pc (cfg_next_block c) cfg_pc_as_int (cfg_pos_from_int c) cfg_zero cfg_length cfg_content c"
 
 end
