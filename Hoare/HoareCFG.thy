@@ -1,131 +1,141 @@
 theory "HoareCFG"
 
-imports "Hoare"
+imports "HoareTripleForInstructions"
 
 begin
 type_synonym position = "int * int"
 type_synonym pred = "(position state_element set \<Rightarrow> bool)"
 
-definition blocktype :: "tblock \<Rightarrow> position state_element set \<Rightarrow> bool" where
-"blocktype ty s == s = {BlockTypeElm ty}"
-
-inductive inst_rule :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
-push_n : "inst_rule (\<langle> h \<le> 1023 \<and> length lst > 0 \<and> 32 \<ge> length lst\<rangle> **
-                       program_counter (k,m) **
+(* To be completed *)
+inductive triple_inst :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
+  inst_push_n : "triple_inst (\<langle> h \<le> 1023 \<and> length lst > 0 \<and> 32 \<ge> length lst\<rangle> **
                        continuing **
+                       program_counter (n,m) **
                        stack_height h **
                        gas_pred g **
-                       blocktype t **
                        rest
                       )
-                      ((k,m), Stack (PUSH_N lst))
-                      (program_counter (k,m + 1 + (int (length lst))) **
-                       continuing **
+                      ((n,m), Stack (PUSH_N lst))
+                      (continuing **
+                       program_counter (n,m + 1 + int (length lst)) **
                        stack_height (Suc h) **
                        gas_pred (g - Gverylow) **
-                       blocktype t **
-                       stack h (word_rcat lst) ** rest
+                       stack h (word_rcat lst) **
+                       rest
                       )"
-| stop : "inst_rule 
-          (\<langle> h \<le> 1024 \<rangle> ** program_counter k ** continuing ** stack_height h ** rest)
+| inst_stop : "triple_inst 
+          (\<langle> h \<le> 1024 \<rangle> ** continuing ** program_counter k ** stack_height h ** rest)
           (k, Misc STOP)
-          (program_counter k ** stack_height h ** not_continuing ** action (ContractReturn []) ** rest)"
-| jumpdest : "inst_rule (\<langle> h \<le> 1024 \<rangle> **
-                       program_counter (k,m) **
+          (stack_height h ** not_continuing ** program_counter k ** action (ContractReturn []) ** rest )"
+| inst_jumpdest : "triple_inst (\<langle> h \<le> 1024 \<rangle> **
                        continuing ** 
+                       program_counter (n,m) **
                        stack_height h **
                        gas_pred g **
                        rest
                       )
-                      ((k,m), Pc JUMPDEST)
-                      (program_counter (k,m + 1) **
-                       continuing **
+                      (_, Pc JUMPDEST)
+                      (continuing **
+                       program_counter (n,m + 1) **
                        stack_height h **
                        gas_pred (g - Gjumpdest) **
                        rest
                       )"
-| inst_rule_weaken_pre:
- "inst_rule p i q \<Longrightarrow> (\<And>s. r s \<Longrightarrow> p s) \<Longrightarrow> inst_rule r i q"
+| inst_strengthen_pre: "triple_inst p i q \<Longrightarrow> (\<And>s. r s \<longrightarrow> p s) \<Longrightarrow> triple_inst r i q"
+| inst_false_pre: "triple_inst \<langle>False\<rangle> i post"
 
-inductive
-  bl :: "cfg \<Rightarrow> pred \<Rightarrow> (pos_inst) list \<Rightarrow> pred \<Rightarrow> bool" 
-where
-  empty : " bl c ((blocktype No)** rest ** common) [] common"(*to improve*)
-| in_block : "\<lbrakk>inst_rule p x q; bl c q xs r\<rbrakk> \<Longrightarrow> bl c p (x#xs) r"
-| next_transition : "
-\<lbrakk> Some (n, _) = cfg_edges c i;
-  Some (ty,co) = cfg_blocks c n;
-      bl c (program_counter (n,0) ** continuing ** rest0 ** (blocktype ty) ** rest) co q \<rbrakk>
-  \<Longrightarrow> bl c (program_counter (i,j) ** continuing ** rest0 ** (blocktype Next) ** rest) [] q" 
-| jump_transition : "
-\<lbrakk> Some (n, _) = cfg_edges c i;
-  Some (ty,co) = cfg_blocks c n;
-      bl c (program_counter (n,0) ** continuing ** stack_height h ** gas_pred a ** blocktype ty **  rest) co q \<rbrakk>
-  \<Longrightarrow> bl c (program_counter (i,j) ** continuing ** stack_height (Suc h) ** gas_pred a ** blocktype Jump ** stack h x ** rest) [] q" 
-| jumpi_transition : "
-\<lbrakk> Some (n1, Some n2) = cfg_edges c i;
-  Some (ty1,co1) = cfg_blocks c n1;
-  Some (ty2,co2) = cfg_blocks c n2;
-      bl c (program_counter (n1,0) ** continuing ** stack_height h ** gas_pred a ** blocktype ty1 **  rest) co1 q;
-      bl c (program_counter (n2,0) ** continuing ** stack_height h ** gas_pred a ** blocktype ty2 **  rest) co2 q \<rbrakk>
-  \<Longrightarrow> bl c (program_counter (i,j) ** continuing ** stack_height (Suc(Suc h)) ** gas_pred a ** blocktype Jumpi ** stack (Suc h) x ** stack h y ** rest) [] q"
-| bl_weaken_pre:
- "bl c p i q \<Longrightarrow> (\<And>s. r s \<Longrightarrow> p s) \<Longrightarrow> bl c r i q"
+inductive triple_seq :: "pred \<Rightarrow> vertex \<Rightarrow> pred \<Rightarrow> bool" where
+  seq_inst : "
+  \<lbrakk> triple_inst pre x q;
+    triple_seq q (n, xs, ty) post \<rbrakk>
+  \<Longrightarrow> triple_seq pre (n, x#xs, ty) post"
+| seq_no : "triple_seq (p ** rest) (n, [], No) p"
+| seq_next : "triple_seq pre (n, [], Next) pre"
+| seq_jump : "(\<And>s. pre s \<longrightarrow> post s) \<Longrightarrow>
+   triple_seq pre (n, [], Jump) post"
+| seq_jumpi : "
+   (\<And>s. pre s \<longrightarrow> post s) \<Longrightarrow>
+   triple_seq pre (n, [], Jumpi) post"
+| seq_weaken_post : "triple_seq pre a post \<Longrightarrow> (\<And>s. post s \<longrightarrow> q s) \<Longrightarrow> triple_seq pre a q "
+| seq_strengthen_pre: "triple_seq p i q \<Longrightarrow> (\<And>s. r s \<longrightarrow> p s) \<Longrightarrow> triple_seq r i q" 
+| seq_false_pre: "triple_seq \<langle>False\<rangle> i post"
 
+inductive triple_cfg :: "cfg \<Rightarrow> pred \<Rightarrow> vertex \<Rightarrow> pred \<Rightarrow> bool" where
+  cfg_no : " triple_seq pre (n, insts, No) post
+  \<Longrightarrow> triple_cfg cfg pre (n, insts, No) post"
+| cfg_next : " 
+  \<lbrakk> cfg_edges cfg n = Some (i,_);
+    cfg_blocks cfg i = Some block;
+    triple_seq pre (n, insts, Next) (program_counter (n,m) ** q);
+    triple_cfg cfg (program_counter (i,0) ** q) block post\<rbrakk>
+  \<Longrightarrow> triple_cfg cfg pre (n, insts, Next) post"
+| cfg_jump : " 
+  \<lbrakk> cfg_edges cfg n = Some (i,_);
+    cfg_blocks cfg i = Some block;
+    triple_seq pre (n, insts, Jump) 
+      (\<langle> h \<le> 1023 \<rangle> **
+       stack_height (Suc h) **
+       stack h _ **
+       gas_pred g **
+       continuing **
+       program_counter (n,m) **
+       rest
+      );
+    triple_cfg cfg 
+      (stack_height h **
+       gas_pred (g - Gmid) **
+       continuing **
+       program_counter (i,0) **
+       rest
+      ) block post\<rbrakk>
+  \<Longrightarrow> triple_cfg cfg pre (n, insts, Jump) post"
+| cfg_jumpi : " 
+  \<lbrakk> cfg_edges cfg n = Some (i, Some j);
+    cfg_blocks cfg i = Some blocki;
+    cfg_blocks cfg j = Some blockj;
+    triple_seq pre (n, insts, Jumpi) 
+        ((\<langle> h \<le> 1022  \<rangle> **
+         stack_height (Suc (Suc h)) **
+         stack (Suc h) d **
+         stack h cond **
+         gas_pred g **
+         continuing **
+         program_counter (n,m) **
+          rest
+        ));
+    r = (stack_height h **
+         gas_pred (g - Ghigh) **
+         continuing **
+          rest
+        );
+    (cond = 0 \<Longrightarrow> triple_cfg cfg (r ** program_counter (i,0)) blocki post);
+    (cond \<noteq> 0 \<Longrightarrow> triple_cfg cfg (r ** program_counter (j,0)) blockj post)
+\<rbrakk>
+  \<Longrightarrow> triple_cfg cfg pre (n, insts, Jumpi) post"
+| cfg_false_pre: "triple_cfg cfg \<langle>False\<rangle> i post"
 
-(* Example *)
-definition c where
-"c = build_cfg [Stack (PUSH_N [1]), Stack (PUSH_N [0x6]), Pc JUMP, Misc STOP, Pc JUMPDEST, Misc STOP]"
+definition triple_inst_sem :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
+"triple_inst_sem pre inst post ==
+    \<forall> co_ctx presult rest stopper. no_assertion co_ctx \<longrightarrow>
+       (pre ** code {inst} ** rest) (instruction_result_as_set co_ctx presult) \<longrightarrow>
+       ((post ** code {inst} ** rest) (instruction_result_as_set co_ctx (program_sem stopper co_ctx 1 presult)))"
 
-lemmas evm_fun_simps = inst_stack_numbers.simps stack_inst_code.simps inst_size_def inst_code.simps 
-pc_inst_numbers.simps 
-misc_inst_numbers.simps
-
-schematic_goal c_val:
- " c = ?p"
-apply(simp add: c_def build_cfg_def word_rcat_def bin_rcat_def Let_def 
-evm_fun_simps
-update_edges_def extract_indexes_def
-  byteListInt_def find_block_def deconstruct_def split:if_splits nat.splits option.splits)
-done
-
-lemma " bl c
-(stack_height 0 ** program_counter (0,0) ** gas_pred 1000 ** continuing ** blocktype Jump)
-(snd (the (cfg_blocks c 0)))
-(stack 0 (word_rcat [1::byte]) ** program_counter (6,1))
-"
-apply(unfold c_val )
-apply(simp add: snd_def )
-apply(rule in_block)
- apply (rule  inst_rule_weaken_pre[OF push_n[where h=0 and g=1000 and rest=emp and t=Jump ]])
- apply simp
-apply(rule in_block)
-apply (rule  inst_rule_weaken_pre[OF push_n[where h=1 and g="1000-Gverylow" 
-      and rest="stack 0 (word_rcat [1])" and t=Jump]])
- apply clarsimp
- apply (rule conjI, assumption)
- apply assumption
-apply (rule bl_weaken_pre[OF jump_transition[where i=0 and j="2 + 1 + int (length [6::8 word])" 
-      and h=1 and a="1000 - Gverylow - Gverylow" and x="(word_rcat [6::byte])" and rest="stack 0 (word_rcat [1::byte])"]])
- apply simp
- apply simp
- apply(simp)
-  apply(auto)
-apply(rule in_block)
-apply (rule inst_rule_weaken_pre[OF jumpdest[where h="Suc 0" and g="(1000 - 2 * Gverylow)"
-      and rest="stack 0 (word_rcat [1]) ** blocktype No"]])
- apply(simp)
- apply(rule conjI)
- apply(auto)
-apply(rule in_block)
-apply (rule inst_rule_weaken_pre[OF stop[where h="Suc 0" 
-      and rest="blocktype No ** stack 0 (word_rcat [1]) ** gas_pred (1000 - 2 * Gverylow - Gjumpdest)"]])
- apply(simp)
- apply(rule conjI)
- apply auto
-apply (rule bl_weaken_pre[OF empty[where rest="not_continuing ** action (ContractReturn []) 
-        ** stack_height (Suc 0) ** gas_pred (1000 - 2 * Gverylow - Gjumpdest)"]])
- apply(simp)
+lemma strengthen_pre_inst_sem:
+  assumes  "triple_inst_sem P c Q"
+  and      "(\<forall> s. R s \<longrightarrow> P s)"
+  shows    " triple_inst_sem R c Q"
+  using assms(1)
+  apply (simp add: triple_inst_sem_def)
+  apply(clarify)
+  apply(drule_tac x = co_ctx in spec)
+  apply(simp)
+  apply(drule_tac x = presult in spec)
+  apply(drule_tac x = rest in spec)
+  apply simp
+  apply (erule impE)
+   apply (sep_drule assms(2)[rule_format])
+   apply assumption
+  apply simp
 done
 
 end
