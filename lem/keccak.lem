@@ -189,6 +189,8 @@ let rec sha3_update lst pos st = match lst with
     if (pos <= rsiz) then sha3_update rest (pos + 1) (update_byte c pos st)
    else sha3_update rest 0 (keccakf (update_byte c pos st))
 end
+declare termination_argument sha3_update = automatic
+
 
 val keccak_final : nat -> list word64 -> list byte
 let keccak_final p st =

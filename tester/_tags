@@ -1,3 +1,4 @@
 "lem": include
 <lem/evm.ml>: coverage
+<lem/evmCode.ml>: coverage
 <*.native>: coverage

@@ -1,7 +1,8 @@
 open Yojson.Basic
 open Hexparser
 open Keccak
-open Evm
+open EvmCode
+open Conv
 
 type env =
   { currentCoinbase : Big_int.big_int
@@ -75,7 +76,7 @@ let format_env (e : env) : Easy_format.t =
 type exec =
   { address : Big_int.big_int
   ; caller : Big_int.big_int
-  ; code : Evm.program
+  ; code : unit EvmCode.program_ext
   ; data : string
   ; gas : Big_int.big_int
   ; gasPrice : Big_int.big_int
@@ -152,25 +153,27 @@ type test_case =
   ; pre : (string * account_state) list
   }
 
-let lookup_storage (addr : address) (pre_state : (string * account_state) list) (index : w256) : w256 =
+
+let lookup_storage (addr : address) (pre_state : (string * account_state) list) (index : Conv.isaw256) : Conv.isaw256 =
   let addr_string = Conv.string_of_address addr in
   try
     let a : account_state = List.assoc addr_string pre_state in
-    let v : string = Conv.bigint_assoc (Conv.big_int_of_word256 index) a.storage in
+    let v : string = Conv.bigint_assoc (Conv.uint256_big index) a.storage in
     let b : Big_int.big_int = Big_int.big_int_of_string v in
-    Conv.word256_of_big_int b
+    Conv.w256_from_big_int b
   with Not_found ->
-       Conv.word256_of_big_int Big_int.zero_big_int
+       Conv.w256_from_int 0
 
-let construct_global_balance (pre_state : (string * account_state) list) (addr : address) : w256 =
+let construct_global_balance (pre_state : (string * account_state) list) (addr : Conv.isaw160) : Conv.isaw256 =
   try
     let lookup_addr = Conv.string_of_address addr in
     let a : account_state = List.assoc lookup_addr pre_state in
-    Conv.word256_of_big_int a.balance
+    Conv.w256_from_big_int a.balance
   with
-    Not_found -> Conv.word256_of_big_int Big_int.zero_big_int
+    Not_found ->
+            Conv.w256_from_int 0 
 
-let construct_ext_program (pre_state : (string * account_state) list) (addr : address) : program =
+let construct_ext_program (pre_state : (string * account_state) list) (addr : address) : unit program_ext =
   try
     let lookup_addr = Conv.string_of_address addr in
     let a : account_state = List.assoc lookup_addr pre_state in
@@ -180,30 +183,31 @@ let construct_ext_program (pre_state : (string * account_state) list) (addr : ad
   with
     Not_found -> empty_program
 
-let construct_block_info (t : test_case) : block_info =
-  let block_number = Conv.word256_of_big_int t.env.currentNumber in
-  { block_blockhash = (fun num ->
-      let num : Big_int.big_int = Conv.big_int_of_word256 num in
+let construct_block_info (t : test_case) : unit block_info_ext =
+  let block_number = Conv.w256_from_big_int t.env.currentNumber in
+  Block_info_ext
+  ((fun num ->
+      let num : Big_int.big_int = Conv.uint256_big num in
       if Big_int.eq_big_int Big_int.zero_big_int num then
-        Conv.word256_of_big_int Big_int.zero_big_int
+        Conv.w256_from_big_int Big_int.zero_big_int
       else if Big_int.lt_big_int num (Big_int.sub_big_int t.env.currentNumber (Big_int.big_int_of_int 256)) then
-        Conv.word256_of_big_int Big_int.zero_big_int
+        Conv.w256_from_big_int Big_int.zero_big_int
       else if Big_int.gt_big_int num t.env.currentNumber then
-        Conv.word256_of_big_int Big_int.zero_big_int
+        Conv.w256_from_big_int Big_int.zero_big_int
       else if Big_int.eq_big_int num t.env.currentNumber then
-        Conv.word256_of_big_int Big_int.zero_big_int
+        Conv.w256_from_big_int Big_int.zero_big_int
       else
         let hashed_byte_list = (Conv.string_as_byte_list
                        (Big_int.string_of_big_int num)) in
         let ret = keccak hashed_byte_list in
         ret
     )
-  ; block_coinbase  = Conv.word160_of_big_int t.env.currentCoinbase
-  ; block_timestamp = Conv.word256_of_big_int t.env.currentTimestamp
-  ; block_number    = block_number
-  ; block_difficulty = Conv.word256_of_big_int t.env.currentDifficulty
-  ; block_gaslimit = Conv.word256_of_big_int t.env.currentGasLimit
-  }
+  , Conv.w160_from_big_int t.env.currentCoinbase
+  , Conv.w256_from_big_int t.env.currentTimestamp
+  , block_number
+  , Conv.w256_from_big_int t.env.currentDifficulty
+  , Conv.w256_from_big_int t.env.currentGasLimit
+  ,())
 
 let construct_account_existence (pre_state : (string * account_state) list) (addr : address) : bool =
   let str = Conv.string_of_address addr in

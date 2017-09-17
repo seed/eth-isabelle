@@ -24,7 +24,7 @@ let () =
   let () = assert (addr_w = Word160.W160 (false, [true; true; true; true]) ) in (* passes *)
   let () = assert (Big_int.eq_big_int addr_big (Conv.big_int_of_word160 addr_w)) in
   let () = Printf.printf "address_printed %s\n" (BatBig_int.to_string_in_hexa (Conv.big_int_of_word160 addr_w)) in
-  let addr_s = Conv.string_of_address addr_w in
+  let addr_s = Conv.string_of_address_old addr_w in
   let () = assert (addr_s = "000000000000000000000000000000000000000f") in
 
   let blockHeaderSample : json = Yojson.Basic.from_file "./sample_json/block_header_sample.json" in

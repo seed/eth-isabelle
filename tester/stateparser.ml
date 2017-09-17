@@ -1,7 +1,7 @@
 
 open Yojson.Basic
 open Keccak
-open Evm
+open EvmCode
 open Block
 open VmTestParser
 
@@ -23,7 +23,7 @@ let secret_to_address str =
   | Point (x,y) ->
     let str = Z.format "%x" x ^ Z.format "%x" y in
     let lst = Conv.byte_list_of_hex_string str in
-    let addr_lst = List.drop 12 (Keccak.keccak' lst) in
+    let addr_lst = List.drop 12 (keccaka lst) in
     Conv.hex_string_of_byte_list "0x" addr_lst
   | _ -> "???"
 

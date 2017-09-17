@@ -1,4 +1,48 @@
-open Evm
+open EvmCode
+
+type isaw256 = num1 bit0 bit0 bit0 bit0 bit0 bit0 bit0 bit0 word
+type isaw160 = num1 bit0 bit1 bit0 bit0 bit0 bit0 bit0 word
+type address = isaw160
+type isaw8 = num1 bit0 bit0 bit0 word
+
+let w4_from_big_int (n:Big_int.big_int) =
+        word_of_int (len0_bit0 (len0_bit0 len0_num1)) (Int_of_integer n);;
+
+let w4_from_int (n:int) = w4_from_big_int (Big_int.big_int_of_int n);;
+
+let w8_from_big_int (n:Big_int.big_int) =
+        word_of_int (len0_bit0 (len0_bit0 (len0_bit0 len0_num1))) (Int_of_integer n);;
+
+let w8_from_int (n:int) = w8_from_big_int (Big_int.big_int_of_int n);;
+
+let w160_from_big_int (n:Big_int.big_int) =
+        word_of_int
+              (len0_bit0
+                (len0_bit0
+                  (len0_bit0
+                    (len0_bit0 (len0_bit0 (len0_bit1 (len0_bit0 len0_num1)))))))
+              (Int_of_integer n);;
+
+let w160_from_int (n:int) = w160_from_big_int (Big_int.big_int_of_int n);;
+
+let w256_from_big_int (n:Big_int.big_int) = (word_of_int
+                (len0_bit0
+                  (len0_bit0
+                    (len0_bit0
+                      (len0_bit0
+                        (len0_bit0
+                          (len0_bit0 (len0_bit0 (len0_bit0 len0_num1))))))))
+                (Int_of_integer n));;
+
+let w256_from_int (n:int) = w256_from_big_int (Big_int.big_int_of_int n);;
+
+let uint256_big n = match uint256 n with Int_of_integer v -> v
+
+let uint160_big n = match uint160 n with Int_of_integer v -> v
+
+let uint8_big n = match uint8 n with Int_of_integer v -> v
+
+(* -- *)
 
 let pad_left (elm : 'a) (len : int) (orig : 'a list) =
   let remaining = len - List.length orig in
@@ -71,11 +115,20 @@ let big_int_of_word160 (Word160.W160 (h, tl)) : Big_int.big_int =
 let int_of_byte (Word8.W8 (h, tl) : Word8.word8) : int =
   Big_int.int_of_big_int (big_int_of_bit_list (pad_right h 8 tl))
 
+let int_of_isaw8 (w : isaw8) : int =
+  Big_int.int_of_big_int (uint8_big w)
+
 (** [string_of_address a] returns a string of 40 characters containing [0-9] and [a-f] *)
-let string_of_address (addr : Word160.word160) : string =
+let string_of_address (addr : address) : string =
+  let b = uint160_big addr in
+  let str = BatBig_int.to_string_in_hexa b in
+  pad_left_string '0' 40 str
+
+let string_of_address_old (addr : Word160.word160) : string =
   let b = big_int_of_word160 addr in
   let str = BatBig_int.to_string_in_hexa b in
   pad_left_string '0' 40 str
+
 
 let rec byte_list_of_hex_string (s : string) =
   if BatString.left s 2 = "0x" then byte_list_of_hex_string (BatString.tail s 2)
@@ -84,20 +137,20 @@ let rec byte_list_of_hex_string (s : string) =
     let first_string = "0x"^(BatString.left s 2) in
     let first_byte = int_of_string first_string in
     let rest = BatString.tail s 2 in
-    byte_of_int first_byte :: byte_list_of_hex_string rest
+    w8_from_int first_byte :: byte_list_of_hex_string rest
 
-let rec hex_str_of_bl_inner (acc : string) (bs : Word8.word8 list) : string =
+let rec hex_str_of_bl_inner (acc : string) (bs : isaw8 list) : string =
   match bs with
   | [] -> acc
   | h :: t ->
-     hex_str_of_bl_inner (acc ^ BatPrintf.sprintf "%02x" (int_of_byte h)) t
+     hex_str_of_bl_inner (acc ^ BatPrintf.sprintf "%02x" (int_of_isaw8 h)) t
 
-let hex_string_of_byte_list (prefix : string) (bs : Word8.word8 list) : string =
+let hex_string_of_byte_list (prefix : string) (bs : isaw8 list) : string =
   prefix^(hex_str_of_bl_inner "" bs)
 
 let format_quad_as_list
-      (act : Evm.contract_action)
-      (stashed_opt : (Nat_big_num.num * Nat_big_num.num) option) : Easy_format.t list =
+      (act : EvmCode.contract_action)
+      (stashed_opt) : Easy_format.t list =
   let open Easy_format in
   [ Label ((Atom ("Action", atom), label), Atom ("to be printed", atom))
   ; Atom ("storage to be printed", atom)
@@ -107,8 +160,8 @@ let format_quad_as_list
 
 let list_usual = ("{", ",", "}", Easy_format.list)
 
-let format_program_result (r : Evm.instruction_result) : Easy_format.t =
-  let open Evm in
+let format_program_result (r : EvmCode.instruction_result) : Easy_format.t =
+  let open EvmCode in
   let open Easy_format in
   match r with
   | InstructionContinue _ -> Atom ("ProgramStepRunOut", atom)
@@ -116,29 +169,52 @@ let format_program_result (r : Evm.instruction_result) : Easy_format.t =
      Label ((Atom ("ProgramToEnvironment", atom), label),
             List (list_usual, format_quad_as_list act stashed_opt))
 
-let format_stack (stack : Word256.word256 list) =
+let format_stack (stack ) =
   Easy_format.(Atom ("format_stack", atom))
 
-let format_integer (i : Nat_big_num.num) : Easy_format.t =
-  Easy_format.(Atom (Nat_big_num.to_string i, atom))
+let tobigint (i:evmint) = match i with Int_of_integer v -> v
 
-let format_variable_ctx (v : Evm.variable_ctx) : Easy_format.t =
+let format_integer (i : evmint) : Easy_format.t =
+  Easy_format.(Atom (Big_int.string_of_big_int (tobigint i), atom))
+
+let format_variable_ctx (v : unit EvmCode.variable_ctx_ext) : Easy_format.t =
   let open Easy_format in
-  let open Evm in
+  let open EvmCode in
+  match v with
+  | Variable_ctx_ext (vctx_stack,
+  vctx_memory ,
+  vctx_memory_usage ,
+  vctx_storage ,
+  vctx_pc ,
+  vctx_balance ,
+  vctx_caller ,
+  vctx_value_sent ,
+  vctx_data_sent ,
+  vctx_storage_at_call ,
+  vctx_balance_at_call ,
+  vctx_origin ,
+  vctx_ext_program ,
+  vctx_block ,
+  vctx_gas ,
+  vctx_account_existence ,
+  vctx_touched_storage_index ,
+  vctx_logs ,
+  vctx_refund ,
+  vctx_gasprice, ()) ->
   List (list_usual,
         [ Label ((Atom ("stack", atom), label),
-                 format_stack v.vctx_stack)
+                 format_stack vctx_stack)
         ; Label ((Atom ("gas", atom), label),
-                 format_integer v.vctx_gas)
+                 format_integer vctx_gas)
         ])
 
-let print_variable_ctx (v : Evm.variable_ctx) : unit =
+let print_variable_ctx (v : unit EvmCode.variable_ctx_ext) : unit =
   Easy_format.Pretty.to_stdout (format_variable_ctx v)
 
-let format_constant_ctx (c : Evm.constant_ctx) : Easy_format.t =
+let format_constant_ctx (c : unit EvmCode.constant_ctx_ext) : Easy_format.t =
   Easy_format.(Atom ("cctx", atom))
 
-let print_constant_ctx (c : Evm.constant_ctx) : unit =
+let print_constant_ctx (c : unit EvmCode.constant_ctx_ext) : unit =
   Easy_format.Pretty.to_stdout (format_constant_ctx c)
 
 
@@ -170,8 +246,11 @@ let string_of_bool_list (lst : bool list) =
 let decimal_of_word256 (w : Word256.word256) =
   Big_int.string_of_big_int (big_int_of_word256 w)
 
-let char_as_byte (c : char) : Word8.word8 =
-  byte_of_int (BatChar.code c)
+let decimal_of_w256 (w : isaw256) =
+  Big_int.string_of_big_int (uint256_big w)
+
+let char_as_byte (c : char) : isaw8 =
+  w8_from_int (BatChar.code c)
 
 let string_as_byte_list (str : string) =
   (List.map char_as_byte (BatString.to_list str))
@@ -182,7 +261,6 @@ let string_of_64list (lst : Int64.t list) =
 let string_of_int_64list ((n, lst) : (int * Int64.t list)) =
   (string_of_int n)^", "^
   string_of_64list lst
-
 exception ToEnvironment of instruction_result
 
 let the_stopper r = raise (ToEnvironment r)

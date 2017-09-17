@@ -1,5 +1,6 @@
 open Keccak
-open Evm
+open EvmCode
+open Conv
 
 module IntMap = BatMap.Make(BatInt)
 
@@ -16,7 +17,20 @@ let empty_program_impl : program_impl =
   ; p_impl_length = 0
   }
 
-let program_from_impl (imp : program_impl) : program =
+let program_from_impl (imp : program_impl) : unit program_ext =
+   Program_ext 
+   ((fun (pos : EvmCode.evmint) ->
+        try Some (IntMap.find (Big_int.int_of_big_int (integer_of_int pos)) imp.p_impl_content)
+        with
+        | Not_found -> None
+        | Failure _ -> None
+      ),Int_of_integer (Big_int.big_int_of_int imp.p_impl_length)
+      ,())
+
+
+   (*
+   
+   (evmint -> inst option) * evmint * 'a
   { program_content =
       (fun (pos : Nat_big_num.num) ->
         try Some (IntMap.find (Nat_big_num.to_int pos) imp.p_impl_content)
@@ -25,9 +39,9 @@ let program_from_impl (imp : program_impl) : program =
         | Failure _ -> None
       )
   ; program_length = Nat_big_num.of_int imp.p_impl_length
-  }
+  } *)
 
-let rec add_unknown_bytes_from (pos : int) (lst : byte list) (orig : inst IntMap.t) : inst IntMap.t =
+let rec add_unknown_bytes_from (pos : int) (lst : Conv.isaw8 list) (orig : inst IntMap.t) : inst IntMap.t =
   match lst with
   | [] -> orig
   | h :: t ->
@@ -138,15 +152,15 @@ let parse_instruction (str : string) : (inst * string) option =
            payload in
        Some (Stack (PUSH_N (Conv.byte_list_of_hex_string payload)), rest)
      else if 0x80 <= opcode_num && opcode_num <= 0x8f then
-       Some (Dup (Conv.nibble_of_int (opcode_num - 0x80)), rest)
+       Some (Dup (Conv.w4_from_int (opcode_num - 0x80)), rest)
      else if 0x90 <= opcode_num && opcode_num <= 0x9f then
-       Some (Swap (Conv.nibble_of_int (opcode_num - 0x90)), rest)
+       Some (Swap (Conv.w4_from_int (opcode_num - 0x90)), rest)
      else if String.length opcode = 2 then
-       Some (Unknown (Conv.byte_of_int opcode_num), rest)
+       Some (Unknown (Conv.w8_from_int opcode_num), rest)
      else
        None
 
-let rec parse_code_inner (acc : program_impl) (hex_inner : string) : program * string =
+let rec parse_code_inner (acc : program_impl) (hex_inner : string) : unit program_ext * string =
   match parse_instruction hex_inner with
   | None -> (program_from_impl acc, hex_inner)
   | Some (instr, rest) ->
@@ -155,7 +169,7 @@ let rec parse_code_inner (acc : program_impl) (hex_inner : string) : program * s
 (** [parse_code "0x...." returns a program and the
  * remaining string
  *)
-let parse_code (hex : string) : program * string =
+let parse_code (hex : string) : unit program_ext * string =
   if BatString.left hex 2 <> "0x"
   then
     failwith "parse_code: prefix is not 0x"

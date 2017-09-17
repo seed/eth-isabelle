@@ -40,6 +40,7 @@ let rec BE_rev n = match n with
  | n -> if n < 256 then [word8FromNatural n] else
          (word8FromNatural (n mod 256) :: BE_rev (n div 256))
 end
+declare termination_argument BE_rev = automatic
 
 declare coq target_rep function BE_rev = (fun n -> BE_rev_prim n n)
 
@@ -100,6 +101,7 @@ let rec RLP tree = match tree with
    if len_s < 56 then word8FromNat (192 + len_s) :: s
    else word8FromNat (247 + length (BE_nat len_s)) :: (BE_nat len_s ++ s)
 end   
+declare termination_argument RLP = automatic
 
 val RLP_nat : natural -> list byte
 let RLP_nat i = RLP (Leaf (BE i))

@@ -1,17 +1,36 @@
-open Evm
+open EvmCode
+open Word256
+open Word160
+open Word8
+open Word4
 open Conv
 
-let empty_program : program =
-  { program_content = (fun _ -> None)
-  ; program_length = Nat_big_num.of_int 0
-  }
+let empty_program : unit program_ext =
+        Program_ext ((fun _ -> None), (Int_of_integer (Big_int.big_int_of_int 0)), ());;
 
-let dummy_constant_ctx : constant_ctx =
-  { cctx_program = empty_program
-  ; cctx_this = word160_of_big_int (Big_int.big_int_of_int 100)
-  ; cctx_hash_filter = (fun _ -> true)
-  }
+type address = word160 
+let dummy_constant_ctx : unit constant_ctx_ext =
+        Constant_ctx_ext (empty_program, w160_from_int 0, (fun _ -> true), ());;
 
+
+let empty_memory = (fun _ -> 
+        word_of_int (len0_bit0 (len0_bit0 (len0_bit0 (len0_num1)))) zero_int);;
+
+let empty_balance _ = w256_from_int 0
+
+let dummy_address = w160_from_int 144545
+
+let empty_ext_program _ = empty_program
+
+let dummy_block_info : unit block_info_ext =
+  Block_info_ext ((fun _ -> w256_from_int 0),
+  dummy_address,
+  w256_from_int 0,
+  w256_from_int 0,
+  w256_from_int 0,
+  w256_from_int 0,
+  ())
+(*
 let empty_memory : memory = (fun _ -> byte_of_big_int Big_int.zero_big_int)
 
 let zero_word = word256_of_big_int Big_int.zero_big_int
@@ -30,7 +49,32 @@ let dummy_block_info : block_info =
   ; block_difficulty = zero_word
   ; block_gaslimit = zero_word
   }
+*)
 
+let dummy_variable_con : unit variable_ctx_ext =
+  Variable_ctx_ext ([],
+  empty_memory,
+  Int_of_integer (Big_int.big_int_of_int 0),
+  empty_storage,
+  Int_of_integer (Big_int.big_int_of_int 0),
+  empty_balance,
+  dummy_address,
+  w256_from_int 0,
+  [],
+  empty_storage,
+  empty_balance,
+  dummy_address,
+  empty_ext_program,
+  dummy_block_info,
+  Int_of_integer (Big_int.big_int_of_int 50000),
+  (fun _ -> false),
+  [],
+  [], 
+  Int_of_integer (Big_int.big_int_of_int 0),
+  w256_from_int 21000000000,
+  ())
+
+(*
 let dummy_variable_con : variable_ctx =
   { vctx_stack = []
   ; vctx_memory = empty_memory
@@ -53,3 +97,4 @@ let dummy_variable_con : variable_ctx =
   ; vctx_logs = []
   ; vctx_refund = Nat_big_num.of_int 0
   }
+*)

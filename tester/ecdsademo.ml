@@ -17,7 +17,7 @@ let do_test () =
   | Point (x,y) ->
     let str = Z.format "%x" x ^ Z.format "%x" y in
     let lst = Conv.byte_list_of_hex_string str in
-    let addr_lst = List.drop 12 (Keccak.keccak' lst) in
+    let addr_lst = List.drop 12 (EvmCode.keccaka lst) in
     Printf.printf "hashing %s to %s\n" str (Conv.hex_string_of_byte_list "" addr_lst)
   | _ -> ()
 
