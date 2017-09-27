@@ -4,6 +4,7 @@ open Constant
 open TestResult
 open Conv
 open EvmCode
+open Sys
 
 
 let spec_includes_actual (spec_storage : list_storage) (touched : isaw256 list) (actual_storage : isaw256 -> isaw256) : bool =
@@ -227,8 +228,30 @@ let r_to_string r =
   | TestFailure -> "failed"
   | TestSkipped -> "skipped"
 
+let has_timeouted st =
+  match st with
+  | Unix.WSIGNALED s -> s = Sys.sigalrm
+  | _ -> false
 
-let test_one_file ((num_success : int ref), (num_failure : int ref), (num_skipped : int ref)) (case_name : string option) (path : string) : unit =
+let timeout f arg time = 
+ let pipe_r,pipe_w = Unix.pipe () in
+ match Unix.fork () with
+   | 0 -> let _ = Unix.alarm time in
+	  let x = (f arg) in
+          let oc = Unix.out_channel_of_descr pipe_w in
+          Marshal.to_channel oc x [];
+          close_out oc;
+          exit 0
+   | pid0 -> 
+       let (pid, st) = Unix.wait () in
+       if pid = pid0 && has_timeouted st then
+          let () = Printf.printf "Timeout!\n" in
+          TestSkipped
+       else
+         let ic = Unix.in_channel_of_descr pipe_r in
+         Marshal.from_channel ic
+
+let test_one_file ((num_success : int ref), (num_failure : int ref), (num_skipped : int ref), (start_from : int ref)) (case_name : string option) (path : string) : unit =
   let vm_arithmetic_test : json = Yojson.Basic.from_file path in
   let vm_arithmetic_test_assoc : (string * json) list = Util.to_assoc vm_arithmetic_test in
   let () =  List.iter
@@ -244,8 +267,28 @@ let test_one_file ((num_success : int ref), (num_failure : int ref), (num_skippe
       in
       if hit then
         begin
-          let () = Printf.printf "===========================test case: %s (%s)\n" label (r_to_string (test_one_case j) ) in
-          match test_one_case j with
+          let () = Printf.printf "+++++++++++++++++++++++++++test case: %s (running)\n" label in
+          let st = Sys.time () in
+          let res =
+            match label with
+            | "loop-exp-16b-100k" -> TestSkipped
+            | "loop-exp-1b-1M" ->  TestSkipped
+            | "loop-exp-2b-100k" ->  TestSkipped
+            | "loop-exp-32b-100k" -> TestSkipped 
+            | "loop-exp-4b-100k" -> TestSkipped 
+            | "loop-exp-8b-100k" -> TestSkipped 
+            | "loop-exp-nop-1M" -> TestSkipped
+            | "loop-mul" -> TestSkipped
+            | "codecopyMemExp"-> TestSkipped
+            | "000bc649eea3f4a0b38edf5ea483aa87d1e4969725d5032532830ae7d1fcee14" -> TestSkipped
+            | _ -> 
+             if !start_from = 0 then
+                TestSkipped
+             else
+                timeout test_one_case j 10 in
+          let endt = Sys.time () 
+          in let () = Printf.printf "===========================test case: %s (%s) (duration=%d)\n" label (r_to_string res) ((int_of_float endt) - (int_of_float st)) in
+          match res with
           | TestSuccess -> num_success := !num_success + 1 
           | TestFailure -> num_failure := !num_failure + 1
           | TestSkipped -> num_skipped := !num_skipped + 1
@@ -260,7 +303,8 @@ let () =
   let num_success = ref 0 in
   let num_failure = ref 0 in
   let num_skipped = ref 0 in
-  let counters = (num_success, num_failure, num_skipped) in
+  let start_from = ref 1 in
+  let counters = (num_success, num_failure, num_skipped, start_from) in
   let () = TraverseJsons.traverse "../tests/VMTests" (test_one_file counters case_name) in
   let () = Printf.printf "success: %i\n" !num_success in
   let () = Printf.printf "failure: %i\n" !num_failure in
