@@ -249,7 +249,9 @@ let timeout f arg time =
           TestSkipped
        else
          let ic = Unix.in_channel_of_descr pipe_r in
-         Marshal.from_channel ic
+         let v = Marshal.from_channel ic in
+         let () = close_in ic in
+	 v
 
 let test_one_file ((num_success : int ref), (num_failure : int ref), (num_skipped : int ref), (start_from : int ref)) (case_name : string option) (path : string) : unit =
   let vm_arithmetic_test : json = Yojson.Basic.from_file path in
