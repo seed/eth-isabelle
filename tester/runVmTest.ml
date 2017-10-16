@@ -233,11 +233,15 @@ let has_timeouted st =
   | Unix.WSIGNALED s -> s = Sys.sigalrm
   | _ -> false
 
+let safe_close fd =
+   try Unix.close fd with
+   | _ -> ()
+
 let timeout f arg time = 
  let pipe_r,pipe_w = Unix.pipe () in
  match Unix.fork () with
    | 0 -> let _ = Unix.alarm time in
-	  let x = (f arg) in
+	  let x = f arg in
           let oc = Unix.out_channel_of_descr pipe_w in
           Marshal.to_channel oc x [];
           close_out oc;
@@ -246,11 +250,14 @@ let timeout f arg time =
        let (pid, st) = Unix.wait () in
        if pid = pid0 && has_timeouted st then
           let () = Printf.printf "Timeout!\n" in
+          let () = safe_close pipe_w in
+          let () = safe_close pipe_r in
           TestSkipped
        else
          let ic = Unix.in_channel_of_descr pipe_r in
          let v = Marshal.from_channel ic in
          let () = close_in ic in
+         let () = safe_close pipe_w in
 	 v
 
 let test_one_file ((num_success : int ref), (num_failure : int ref), (num_skipped : int ref), (start_from : int ref)) (case_name : string option) (path : string) : unit =
