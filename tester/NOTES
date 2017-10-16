@@ -1,0 +1,15 @@
+This sets up ocaml environment:
+eval `opam config env`
+
+Run `make lem-thy`
+Run isabelle code-gen which generates evmCode.ml
+Comment out Module structure from evmCode.ml
+Rename s/<int>/evmint/g in evmCode.ml
+
+Run `sh compile.sh` which copies all lem directory in .
+Run runVmTest.native
+
+
+
+
+
