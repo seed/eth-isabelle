@@ -23,6 +23,7 @@ open import Word8
 open import Word4
 open import Keccak
 
+type w8 = word8
 (* The frequently used machine word types are named here.  For example, address *)
 (* is the type of 160-bit machine words.  The type w256 is the type of EVM machine words. *)
 
@@ -34,6 +35,10 @@ let sintFromW256 = word256ToInteger
 val uint : w256 -> integer
 let uint w = integerFromNatural (word256ToNatural w)
 declare isabelle target_rep function uint = `Word.uint`
+
+val uintFromW8 : w8 -> integer
+let uintFromW8 w = integerFromNatural (word8ToNatural w)
+declare isabelle target_rep function uintFromW8 = `Word.uint`
 
 (* val word256ToNat : w256 -> nat *)
 (* let word256ToNat = word256ToNat *)
@@ -485,8 +490,24 @@ type pc_inst =
  | PC (* the current location in the code *)
  | JUMPDEST (* a no-op instruction located to indicate jump destinations. *)
 
-(* If a jump occurs to a location where @{term JUMPDEST} is not found, the execution fails. *)
+ (* experimental subroutine instructions *)
+type evm15_inst =
+ | JUMPIF of w8 * w8
+ | JUMPTO of w8 * w8
+ | JUMPSUB of w8 * w8
+ | BEGINSUB of w8 * w8 * w8 * w8
+ | RETURNSUB
 
+(* If a jump occurs to a location where @{term JUMPDEST} is not found, the execution fails. *)
+(* 0xB0 JUMPTO
+ * 0xB1 JUMPIF
+ * 0XB2 JUMPSUB
+ * 0xB4 JUMPSUBV
+ * 0xB5 BEGINSUB
+ * 0xB6 BEGINDATA
+ * 0xB8 RETURNSUB
+ * 0xB9 PUTLOCAL
+ * 0xBA GETLOCAL*)
 val pc_inst_code : pc_inst -> byte
 let pc_inst_code inst = match inst with
 | JUMP -> 0X56
@@ -495,12 +516,30 @@ let pc_inst_code inst = match inst with
 | JUMPDEST -> 0X5b
 end
 
+val evm15_inst_code : evm15_inst -> list byte
+let evm15_inst_code inst = match inst with
+| JUMPTO a1 a2 -> [0XB0; a1; a2]
+| JUMPIF a1 a2 -> [0XB1; a1; a2]
+| JUMPSUB a1 a2 -> [0XB2; a1; a2]
+| BEGINSUB a1 a2 r1 r2 -> [0XB5; a1; a2; r1; r2]
+| RETURNSUB -> [0XB8]
+end
+
 val pc_inst_numbers : pc_inst -> stack_numbers
 let pc_inst_numbers inst = match inst with
 | JUMP -> (1, 0)
 | JUMPI -> (2, 0)
 | PC -> (0, 1)
 | JUMPDEST -> (0, 0)
+end
+
+val evm15_inst_numbers : evm15_inst -> stack_numbers
+let evm15_inst_numbers inst = match inst with
+| JUMPTO _ _ -> (0, 0)
+| JUMPIF _ _ -> (1, 0)
+| JUMPSUB _ _ -> (0, 0)
+| BEGINSUB _ _ _ _-> (0, 0)
+| RETURNSUB -> (0, 0)
 end
 
 
@@ -625,6 +664,7 @@ type inst =
   | Swap of swap_inst
   | Log of log_inst
   | Misc of misc_inst
+  | Evm15 of evm15_inst
 
 (* subsection {* The Whole Instruction Set *} *)
 
@@ -650,6 +690,7 @@ let inst_code inst = match inst with
 | Swap s -> [swap_inst_code s]
 | Log l -> [log_inst_code l]
 | Misc m -> [misc_inst_code m]
+| Evm15 e -> evm15_inst_code e
 end
 
 val inst_stack_numbers : inst -> stack_numbers
@@ -667,6 +708,7 @@ let inst_stack_numbers i = match i with
 | Swap s -> swap_inst_numbers s
 | Log l -> log_inst_numbers l
 | Misc m -> misc_inst_numbers m
+| Evm15 e -> evm15_inst_numbers e
 end
 
 
@@ -975,6 +1017,7 @@ type log_entry = <|
 
 type variable_ctx = <|
   vctx_stack : list w256;
+  vctx_return_stack : list w256;
   vctx_memory : memory;
   vctx_memory_usage : integer; (* the current memory usage *)
   vctx_storage : storage;
@@ -1170,6 +1213,13 @@ end
 
 (* The JUMP instruction has the following meaning.  When it cannot find the JUMPDEST instruction *)
 (* at the destination, the execution fails. *)
+val jumpto : variable_ctx -> constant_ctx -> w8 -> w8 -> instruction_result
+let jumpto v c a1 a2 =
+    let v_new = <| v with vctx_pc = (uintFromW8 a1 * 256 + uintFromW8 a2) |> in
+    match vctx_next_instruction v_new c with
+      | Just (Pc JUMPDEST) -> InstructionContinue v_new
+      | _ -> instruction_failure_result v [InvalidJumpDestination]
+    end
 
 val jump : variable_ctx -> constant_ctx -> instruction_result
 let jump v c = match v.vctx_stack with
@@ -1206,6 +1256,18 @@ let jumpi v c = match v.vctx_stack with
     strict_if (cond = 0)
            (blockedInstructionContinue (vctx_advance_pc c (vctx_pop_stack 2 v)))
            (blocked_jump new_env c)
+ | _ -> instruction_failure_result v [TooShortStack]
+end
+
+(* The JUMPIF instruction is implemented using the JUMP instruction. *)
+val jumpif : variable_ctx -> constant_ctx -> w8 -> w8 -> instruction_result
+let jumpif v c a1 a2 = match v.vctx_stack with
+ | cond :: rest ->
+    let new_env = <| v with vctx_stack = rest |> in
+    if cond = 0 then
+           InstructionContinue (vctx_advance_pc c new_env)
+    else
+           jumpto new_env c a1 a2
  | _ -> instruction_failure_result v [TooShortStack]
 end
 
@@ -1674,6 +1736,11 @@ let thirdComponentOfC i s0 s1 s2 s3 recipient_empty orig_val new_val remaining_g
   | Info EXTCODESIZE -> Gextcode net
   | Info BALANCE -> Gbalance net
   | Info BLOCKHASH -> Gblockhash
+  | Evm15 (JUMPTO _ _) -> Gmid
+  | Evm15 (JUMPIF _ _) -> Ghigh
+  | Evm15 (JUMPSUB _ _) -> Ghigh
+  | Evm15 (BEGINSUB _ _ _ _) -> Gjumpdest
+  | Evm15 RETURNSUB -> Ghigh
   | _ -> 0 (* How is this case dealt in the yellow paper *)
   end
 
@@ -1740,6 +1807,8 @@ let instruction_sem v c inst net =
   | Pc JUMPI -> jumpi v c
   | Pc JUMP -> jump v c
   | Pc JUMPDEST -> stack_0_0_op v c
+  | Evm15 (JUMPTO a1 a2) -> jumpto v c a1 a2
+  | Evm15 (JUMPIF a1 a2) -> jumpif v c a1 a2
   | Info CALLDATASIZE -> stack_0_1_op v c (datasize v)
   | Stack CALLDATALOAD -> stack_1_1_op v c (cut_data v)
   | Info CALLER -> stack_0_1_op v c (address_to_w256 v.vctx_caller)
@@ -2042,6 +2111,7 @@ indreln [build_vctx_called : account_state -> call_env -> variable_ctx -> bool]
     bal a.account_address = a.account_balance ==>
     build_vctx_called a env
  <| vctx_stack = []; (* The stack is initialized for every invocation *)
+    vctx_return_stack = [];
     vctx_memory = empty_memory; (* The memory is also initialized for every invocation *)
      vctx_memory_usage = 0; (* The memory usage is initialized. *)
      vctx_storage = a.account_storage; (* The storage is taken from the account state *)
@@ -2077,7 +2147,7 @@ indreln [build_vctx_called : account_state -> call_env -> variable_ctx -> bool]
 
 indreln [build_vctx_returned : account_state -> return_result -> variable_ctx -> bool]
 vctx_returned:
-   forall a_code v_pc new_bal a_bal a_addr a_storage v_stack v_memory v_memory_usage
+   forall a_code v_pc new_bal a_bal a_addr a_storage v_stack v_return_stack v_memory v_memory_usage
           v_storage v_balance v_caller v_value v_data v_init_storage v_init_balance
           v_origin v_gasprice v_ext_program v_ext_program' v_block v_gas v_gas' mem_start mem_size
           r rest whichever v_ex v_ex' v_touched v_logs v_refund.
@@ -2092,6 +2162,7 @@ vctx_returned:
      ; account_balance = a_bal
      ; account_ongoing_calls =
          ((<| vctx_stack = v_stack
+        ; vctx_return_stack = v_return_stack
          ; vctx_memory = v_memory
          ; vctx_memory_usage = v_memory_usage
          ; vctx_storage = v_storage
@@ -2120,6 +2191,7 @@ vctx_returned:
 
      (* here is the third argument *)
      (<| vctx_stack = 1 :: v_stack (* 1 is pushed, indicating a return *)
+       ; vctx_return_stack = v_return_stack
        ; vctx_memory =
          put_return_values v_memory r.return_data mem_start mem_size
        ; vctx_memory_usage = v_memory_usage
