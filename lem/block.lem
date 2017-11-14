@@ -98,7 +98,8 @@ type block = <|
 
 let start_env a state args caller origin gasprice block =
 <| vctx_stack = []; (* The stack is initialized for every invocation *)
-   vctx_return_stack = [];
+   vctx_return_stack = [~1];
+   vctx_frame_stack = [0];
     vctx_memory = empty_memory; (* The memory is also initialized for every invocation *)
      vctx_memory_usage = 0; (* The memory usage is initialized. *)
      vctx_storage = a.account_storage; (* The storage is taken from the account state *)
@@ -122,7 +123,8 @@ let start_env a state args caller origin gasprice block =
 
 let create_env a state value data gas caller origin gasprice block =
 <| vctx_stack = []; (* The stack is initialized for every invocation *)
-   vctx_return_stack = [];
+   vctx_return_stack = [~1];
+   vctx_frame_stack = [0];
     vctx_memory = empty_memory; (* The memory is also initialized for every invocation *)
      vctx_memory_usage = 0; (* The memory usage is initialized. *)
      vctx_storage = a.account_storage; (* The storage is taken from the account state *)
@@ -155,6 +157,7 @@ let vctx_update_from_world v a state called_v = <|
      
      vctx_stack = v.vctx_stack;
      vctx_return_stack = v.vctx_return_stack;
+     vctx_frame_stack = v.vctx_frame_stack;
      vctx_memory = v.vctx_memory; (* The memory is also initialized for every invocation *)
      vctx_memory_usage = v.vctx_memory_usage; (* The memory usage is initialized. *)
      vctx_pc = v.vctx_pc; (* The program counter is initialized to zero *)

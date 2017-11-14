@@ -1018,6 +1018,7 @@ type log_entry = <|
 type variable_ctx = <|
   vctx_stack : list w256;
   vctx_return_stack : list w256;
+  vctx_frame_stack : list w256;
   vctx_memory : memory;
   vctx_memory_usage : integer; (* the current memory usage *)
   vctx_storage : storage;
@@ -1211,11 +1212,15 @@ let sstore v c = match v.vctx_stack with
  | _ -> instruction_failure_result v [TooShortStack]
 end
 
+val combine_w8s_to_uint: w8 -> w8 -> integer
+let combine_w8s_to_uint v1 v2 =
+        (uintFromW8 v1 * 256 + uintFromW8 v2)
+
 (* The JUMP instruction has the following meaning.  When it cannot find the JUMPDEST instruction *)
 (* at the destination, the execution fails. *)
 val jumpto : variable_ctx -> constant_ctx -> w8 -> w8 -> instruction_result
 let jumpto v c a1 a2 =
-    let v_new = <| v with vctx_pc = (uintFromW8 a1 * 256 + uintFromW8 a2) |> in
+    let v_new = <| v with vctx_pc = combine_w8s_to_uint a1 a2 |> in
     match vctx_next_instruction v_new c with
       | Just (Pc JUMPDEST) -> InstructionContinue v_new
       | _ -> instruction_failure_result v [InvalidJumpDestination]
@@ -1794,6 +1799,18 @@ let signextend len w =
     if masked < middle then masked
     else masked - middle - middle
 
+val combine_w8s_to_w256: w8 -> w8 -> w256
+let combine_w8s_to_w256 v1 v2 =
+  (byte_to_w256 v1 * 256 + byte_to_w256 v2)
+
+
+val beginsub : variable_ctx -> constant_ctx -> w8 -> w8 -> w8 -> w8 -> instruction_result
+let beginsub v c na1 na2 nr1 nr2 =
+  let nargs = combine_w8s_to_w256 na1 na2 in
+  let sp = word256FromNat (length (v.vctx_stack)) in
+  let v = <| v  with vctx_frame_stack = (sp - nargs) :: v.vctx_frame_stack |> in
+  stack_0_0_op v c
+
 (* Finally, using the above definitions, I can define a function that operates an instruction *)
 (* on the execution environments. *)
 val instruction_sem : variable_ctx -> constant_ctx -> inst -> network -> instruction_result
@@ -1809,6 +1826,7 @@ let instruction_sem v c inst net =
   | Pc JUMPDEST -> stack_0_0_op v c
   | Evm15 (JUMPTO a1 a2) -> jumpto v c a1 a2
   | Evm15 (JUMPIF a1 a2) -> jumpif v c a1 a2
+  | Evm15 (BEGINSUB na1 na2 nr1 nr2) -> beginsub v c na1 na2 nr1 nr2
   | Info CALLDATASIZE -> stack_0_1_op v c (datasize v)
   | Stack CALLDATALOAD -> stack_1_1_op v c (cut_data v)
   | Info CALLER -> stack_0_1_op v c (address_to_w256 v.vctx_caller)
@@ -2111,7 +2129,8 @@ indreln [build_vctx_called : account_state -> call_env -> variable_ctx -> bool]
     bal a.account_address = a.account_balance ==>
     build_vctx_called a env
  <| vctx_stack = []; (* The stack is initialized for every invocation *)
-    vctx_return_stack = [];
+    vctx_return_stack = [~1];
+    vctx_frame_stack = [0];
     vctx_memory = empty_memory; (* The memory is also initialized for every invocation *)
      vctx_memory_usage = 0; (* The memory usage is initialized. *)
      vctx_storage = a.account_storage; (* The storage is taken from the account state *)
@@ -2147,7 +2166,7 @@ indreln [build_vctx_called : account_state -> call_env -> variable_ctx -> bool]
 
 indreln [build_vctx_returned : account_state -> return_result -> variable_ctx -> bool]
 vctx_returned:
-   forall a_code v_pc new_bal a_bal a_addr a_storage v_stack v_return_stack v_memory v_memory_usage
+   forall a_code v_pc new_bal a_bal a_addr a_storage v_stack v_return_stack v_frame_stack v_memory v_memory_usage
           v_storage v_balance v_caller v_value v_data v_init_storage v_init_balance
           v_origin v_gasprice v_ext_program v_ext_program' v_block v_gas v_gas' mem_start mem_size
           r rest whichever v_ex v_ex' v_touched v_logs v_refund.
@@ -2162,7 +2181,8 @@ vctx_returned:
      ; account_balance = a_bal
      ; account_ongoing_calls =
          ((<| vctx_stack = v_stack
-        ; vctx_return_stack = v_return_stack
+         ; vctx_return_stack = v_return_stack
+         ; vctx_frame_stack = v_frame_stack
          ; vctx_memory = v_memory
          ; vctx_memory_usage = v_memory_usage
          ; vctx_storage = v_storage
@@ -2192,6 +2212,7 @@ vctx_returned:
      (* here is the third argument *)
      (<| vctx_stack = 1 :: v_stack (* 1 is pushed, indicating a return *)
        ; vctx_return_stack = v_return_stack
+       ; vctx_frame_stack = v_frame_stack
        ; vctx_memory =
          put_return_values v_memory r.return_data mem_start mem_size
        ; vctx_memory_usage = v_memory_usage
