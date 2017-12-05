@@ -1840,7 +1840,7 @@ end
 
 val getlocal : variable_ctx -> constant_ctx -> w8 -> w8 -> instruction_result
 let getlocal v c i1 i2 =
-  let idx = natFromInteger (combine_w8s_to_uint i1 i2) in
+  let idx = combine_w8s_to_nat i1 i2 in
   match List.index v.vctx_frame_stack 0 with
   | Just fp ->
     let rev_stk = List.reverse (v.vctx_stack) in
@@ -1854,7 +1854,7 @@ let getlocal v c i1 i2 =
 
 val putlocal : variable_ctx -> constant_ctx -> w8 -> w8 -> instruction_result
 let putlocal v c i1 i2 =
-  let idx = natFromInteger (combine_w8s_to_uint i1 i2) in
+  let idx = combine_w8s_to_nat i1 i2 in
   match List.index v.vctx_frame_stack 0 with
   | Just fp ->
     match v.vctx_stack with
