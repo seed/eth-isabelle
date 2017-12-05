@@ -497,6 +497,8 @@ type evm15_inst =
  | JUMPSUB of w8 * w8
  | BEGINSUB of w8 * w8 * w8 * w8
  | RETURNSUB
+ | GETLOCAL of w8 * w8
+ | PUTLOCAL of w8 * w8
 
 (* If a jump occurs to a location where @{term JUMPDEST} is not found, the execution fails. *)
 (* 0xB0 JUMPTO
@@ -523,6 +525,8 @@ let evm15_inst_code inst = match inst with
 | JUMPSUB a1 a2 -> [0XB2; a1; a2]
 | BEGINSUB a1 a2 r1 r2 -> [0XB5; a1; a2; r1; r2]
 | RETURNSUB -> [0XB8]
+| GETLOCAL a1 a2 -> [0XB9; a1; a2]
+| PUTLOCAL a1 a2 -> [0XB8; a1; a2]
 end
 
 val pc_inst_numbers : pc_inst -> stack_numbers
@@ -540,6 +544,8 @@ let evm15_inst_numbers inst = match inst with
 | JUMPSUB _ _ -> (0, 0)
 | BEGINSUB _ _ _ _-> (0, 0)
 | RETURNSUB -> (0, 0)
+| GETLOCAL _ _ -> (0, 1)
+| PUTLOCAL _ _ -> (1, 0)
 end
 
 
@@ -1017,8 +1023,8 @@ type log_entry = <|
 
 type variable_ctx = <|
   vctx_stack : list w256;
-  vctx_return_stack : list w256;
-  vctx_frame_stack : list w256;
+  vctx_return_stack : list integer;
+  vctx_frame_stack : list nat;
   vctx_memory : memory;
   vctx_memory_usage : integer; (* the current memory usage *)
   vctx_storage : storage;
@@ -1799,17 +1805,67 @@ let signextend len w =
     if masked < middle then masked
     else masked - middle - middle
 
-val combine_w8s_to_w256: w8 -> w8 -> w256
-let combine_w8s_to_w256 v1 v2 =
-  (byte_to_w256 v1 * 256 + byte_to_w256 v2)
+val combine_w8s_to_nat: w8 -> w8 -> nat
+let combine_w8s_to_nat v1 v2 =
+  natFromNatural (word8ToNatural v1) * 256 + natFromNatural (word8ToNatural v2)
 
+val jumpsub : variable_ctx -> constant_ctx -> w8 -> w8 -> instruction_result
+let jumpsub v c a1 a2 =
+  let new_pc = combine_w8s_to_uint a1 a2 in
+  let pc =  v.vctx_pc in
+  let v_new = <| v  with vctx_return_stack = pc + integerFromInt (inst_size (Evm15 (JUMPSUB a1 a2))) :: v.vctx_return_stack ;
+                     vctx_pc = new_pc |> in
+  match vctx_next_instruction v_new c with
+    | Just (Evm15 (BEGINSUB _ _ _ _)) -> InstructionContinue v_new
+    | _ -> instruction_failure_result v [InvalidJumpDestination]
+  end
 
 val beginsub : variable_ctx -> constant_ctx -> w8 -> w8 -> w8 -> w8 -> instruction_result
-let beginsub v c na1 na2 nr1 nr2 =
-  let nargs = combine_w8s_to_w256 na1 na2 in
-  let sp = word256FromNat (length (v.vctx_stack)) in
-  let v = <| v  with vctx_frame_stack = (sp - nargs) :: v.vctx_frame_stack |> in
-  stack_0_0_op v c
+let beginsub v c na1 na2 _ _ =
+  let nargs = combine_w8s_to_nat na1 na2 in
+  let sp = List.length (v.vctx_stack) in
+  (* sp - nargs == number of elements on the stack before the arguments were pushed *)
+  if sp >= nargs then
+    let v = <| v  with vctx_frame_stack = (sp - nargs) :: v.vctx_frame_stack |> in
+    stack_0_0_op v c
+  else
+    instruction_failure_result v [TooShortStack]
+
+val returnsub : variable_ctx -> constant_ctx -> instruction_result
+let returnsub v _ = match (v.vctx_return_stack, v.vctx_frame_stack) with
+ | (new_pc :: rs_tl, _ :: fs_tl) ->
+    InstructionContinue (<| v with vctx_pc = new_pc; vctx_return_stack = rs_tl; vctx_frame_stack = fs_tl |>)
+ | (_,_) -> instruction_failure_result v [TooShortStack]
+end
+
+val getlocal : variable_ctx -> constant_ctx -> w8 -> w8 -> instruction_result
+let getlocal v c i1 i2 =
+  let idx = natFromInteger (combine_w8s_to_uint i1 i2) in
+  match List.index v.vctx_frame_stack 0 with
+  | Just fp ->
+    let rev_stk = List.reverse (v.vctx_stack) in
+    match List.index rev_stk (fp + idx) with
+    | Just el ->
+      stack_0_1_op v c el
+    | _ -> instruction_failure_result v [TooShortStack]
+    end
+  | _ -> instruction_failure_result v [ShouldNotHappen]
+ end
+
+val putlocal : variable_ctx -> constant_ctx -> w8 -> w8 -> instruction_result
+let putlocal v c i1 i2 =
+  let idx = natFromInteger (combine_w8s_to_uint i1 i2) in
+  match List.index v.vctx_frame_stack 0 with
+  | Just fp ->
+    match v.vctx_stack with
+    | el::stk ->
+      let new_stk = List.reverse (List.update (List.reverse stk) (fp + idx) el) in
+      let new_v = <| v with vctx_stack = new_stk |> in
+      stack_0_1_op new_v c el
+    | _ -> instruction_failure_result v [TooShortStack]
+    end
+  | _ -> instruction_failure_result v [ShouldNotHappen]
+ end
 
 (* Finally, using the above definitions, I can define a function that operates an instruction *)
 (* on the execution environments. *)
@@ -1827,6 +1883,10 @@ let instruction_sem v c inst net =
   | Evm15 (JUMPTO a1 a2) -> jumpto v c a1 a2
   | Evm15 (JUMPIF a1 a2) -> jumpif v c a1 a2
   | Evm15 (BEGINSUB na1 na2 nr1 nr2) -> beginsub v c na1 na2 nr1 nr2
+  | Evm15 (JUMPSUB a1 a2) -> jumpsub v c a1 a2
+  | Evm15 (RETURNSUB) -> returnsub v c
+  | Evm15 (GETLOCAL i1 i2) -> getlocal v c i1 i2
+  | Evm15 (PUTLOCAL i1 i2) -> putlocal v c i1 i2
   | Info CALLDATASIZE -> stack_0_1_op v c (datasize v)
   | Stack CALLDATALOAD -> stack_1_1_op v c (cut_data v)
   | Info CALLER -> stack_0_1_op v c (address_to_w256 v.vctx_caller)
