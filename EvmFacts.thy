@@ -88,7 +88,9 @@ lemma thirdComponentOfC_gt_0:
              simp add: gas_simps word_less_def word_neq_0_conv)
          apply (clarsimp split: misc_inst.splits)
          apply (rule conjI, clarsimp simp add: gas_simps L_def)
-         apply (clarsimp simp: Csuicide_gt_0 Ccall_gt_0  split:if_splits)
+          apply (clarsimp simp: Csuicide_gt_0 Ccall_gt_0  split:if_splits)
+         apply(rename_tac z)
+         apply(case_tac z, simp_all add: gas_simps Csstore_def)
          done
 
 lemma Cmem_lift:
@@ -192,8 +194,30 @@ lemma inst_sem_gas_consume:
      apply (case_tac "x10"; clarsimp simp: instruction_sem_simps  split: pc_inst.splits option.splits list.splits)
      apply (clarsimp simp: instruction_sem_simps  split: pc_inst.splits option.splits)
      apply (case_tac "x12"; clarsimp simp: instruction_sem_simps  split: pc_inst.splits option.splits)
-  apply (case_tac "x13"; clarsimp simp: instruction_sem_simps  split: pc_inst.splits option.splits list.splits if_splits)
-    done
+   apply (case_tac "x13"; clarsimp simp: instruction_sem_simps  split: pc_inst.splits option.splits list.splits if_splits)
+  apply(rename_tac z)
+  apply(case_tac z, clarsimp simp: instruction_sem_simps jumpif_def jumpto_def Let_def split: pc_inst.splits option.splits list.splits if_splits)
+         apply (case_tac x2 ; clarsimp simp: instruction_sem_simps split:list.splits)
+         apply (case_tac x9 ; clarsimp simp: instruction_sem_simps split:list.splits)
+        apply (case_tac x2 ; clarsimp simp: instruction_sem_simps split:list.splits)
+        apply (case_tac x9 ; clarsimp simp: instruction_sem_simps split:list.splits)
+       apply(clarsimp simp: instruction_sem_simps jumpif_def jumpto_def Let_def split: pc_inst.splits option.splits list.splits if_splits)
+        apply (case_tac x2 ; clarsimp simp: instruction_sem_simps split:list.splits)
+        apply (case_tac x9 ; clarsimp simp: instruction_sem_simps split:list.splits)
+       apply (case_tac x2 ; clarsimp simp: instruction_sem_simps split:list.splits)
+       apply (case_tac x9 ; clarsimp simp: instruction_sem_simps split:list.splits)
+      apply clarsimp
+      apply(clarsimp simp: instruction_sem_simps jumpsub_def Let_def split: pc_inst.splits option.splits list.splits if_splits)  
+       apply (case_tac x2 ; clarsimp simp: instruction_sem_simps split:list.splits)
+       apply (case_tac x14 ; clarsimp simp: instruction_sem_simps split:list.splits)
+      apply (case_tac x2 ; clarsimp simp: instruction_sem_simps split:list.splits)
+      apply (case_tac x14 ; clarsimp simp: instruction_sem_simps split:list.splits)
+     apply(clarsimp simp: instruction_sem_simps beginsub_def Let_def split: pc_inst.splits option.splits list.splits if_splits)   
+    apply(clarsimp simp: instruction_sem_simps returnsub_def Let_def split: pc_inst.splits option.splits list.splits if_splits) 
+   apply(clarsimp simp: instruction_sem_simps getlocal_def Let_def split: pc_inst.splits option.splits list.splits if_splits)
+  apply(clarsimp simp: instruction_sem_simps putlocal_def Let_def split: pc_inst.splits option.splits list.splits if_splits) 
+  done
+
 
 termination program_sem_t
   apply (relation "measure (\<lambda>(c,net,ir). nat (case ir of InstructionContinue v \<Rightarrow>  vctx_gas v | _ \<Rightarrow> 0))")

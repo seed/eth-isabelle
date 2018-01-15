@@ -1752,6 +1752,8 @@ let thirdComponentOfC i s0 s1 s2 s3 recipient_empty orig_val new_val remaining_g
   | Evm15 (JUMPSUB _ _) -> Ghigh
   | Evm15 (BEGINSUB _ _ _ _) -> Gjumpdest
   | Evm15 RETURNSUB -> Ghigh
+  | Evm15 (GETLOCAL _ _) -> Glow
+  | Evm15 (PUTLOCAL _ _) -> Glow
   | _ -> 0 (* How is this case dealt in the yellow paper *)
   end
 

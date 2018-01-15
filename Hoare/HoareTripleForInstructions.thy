@@ -343,7 +343,9 @@ apply(rename_tac s)
 apply(case_tac s; simp add: stack_inst_code.simps)
 apply(rename_tac l)
 apply(case_tac l; simp)
-apply(split if_splits; auto)
+   apply(split if_splits; auto)
+  apply(rename_tac z)
+  apply(case_tac z, simp_all add: evm15_inst_code.simps)
 done
 
 lemma advance_pc_different[simp]:
@@ -969,15 +971,16 @@ lemma prog_content_vctx_next_instruction:
 
 lemma inst_size_eq_1:
   "\<forall>x. inst \<noteq> Stack (PUSH_N x) \<Longrightarrow>
+   \<forall>x. inst \<noteq> Evm15 x \<Longrightarrow>
     inst_size inst = 1"
   apply (case_tac inst; simp add: inst_size_def inst_code.simps)
-  apply (rename_tac x)
-  apply (case_tac x  ;fastforce simp add: stack_inst_code.simps)
+   apply (rename_tac x)
+   apply (case_tac x  ;fastforce simp add: stack_inst_code.simps)
   done
 
 lemma inst_size_no_stack_eq_1[simplified image_def, simp]:
-  "inst \<notin> (Stack ` range PUSH_N) \<Longrightarrow> inst_size inst = 1"
-  "inst \<notin> range Stack \<Longrightarrow> inst_size inst = 1"
+  "inst \<notin> (Stack ` range PUSH_N \<union> range Evm15) \<Longrightarrow> inst_size inst = 1"
+  "inst \<notin> (range Stack \<union> range Evm15) \<Longrightarrow> inst_size inst = 1"
   by (auto intro: inst_size_eq_1)
 
 lemma advance_pc_no_inst:
@@ -985,7 +988,7 @@ lemma advance_pc_no_inst:
   by (simp add: vctx_advance_pc_def vctx_next_instruction_def split:option.splits)
 
 lemma advance_pc_inc_but_stack :
- "program_content (cctx_program co_ctx) (vctx_pc x) = Some inst \<Longrightarrow> inst \<notin> range Stack\<Longrightarrow> 
+ "program_content (cctx_program co_ctx) (vctx_pc x) = Some inst \<Longrightarrow> inst \<notin> range Stack \<union> range Evm15 \<Longrightarrow> 
   vctx_pc (vctx_advance_pc co_ctx x) = vctx_pc x + 1"
 by (case_tac inst; simp add: vctx_next_instruction_def vctx_advance_pc_def inst_size_def inst_code.simps)
 
