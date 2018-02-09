@@ -2,7 +2,7 @@ theory BasicToken
 
 imports
   Dispatcher
-     "~~/src/HOL/Eisbach/Eisbach"
+  "~~/src/HOL/Eisbach/Eisbach"
 
 begin
 (*
@@ -381,63 +381,17 @@ lemma two_power_of_224:
  "(0x100000000000000000000000000000000000000000000000000000000::nat) = 2^224"
   by eval
 
-lemma aux : "(word_rcat (xs @[x::byte])::w256) = (word_rcat xs << 8) + (ucast x)"
-  sorry
-
-lemma aux2 : "word_rcat (ys::byte list) >> 8 * k =
-       (word_rcat (take (length ys - k) ys) ::w256)"
-  apply(induction k arbitrary: ys, simp)
-  apply clarsimp
-  apply(drule_tac x="take (length ys - 1) ys" in meta_spec)
-  apply simp
-  apply(erule subst)
-  find_theorems word_rcat take
-
-
-lemma
-  "word_rcat ((ys::byte list) @ xs) >> (8 * length xs) = (word_rcat ys :: w256)"
-  apply (induction xs rule:rev_induct; simp)
-  apply(subst append_assoc[symmetric], subst aux)
-  find_theorems "_ >> _" " _ << _" 
-  apply (erule subst)
-  apply (simp add: shiftr_bl )
-  apply (simp add: word_rcat_def)
-  apply (subst bin_rcat_def)
-  apply (simp )
-  oops
-
-lemma take_32_of_w256:
-  fixes w1::byte and w2 :: byte and w3 :: byte and w4 :: byte and xs :: "bool list"
-  shows
- "length xs = 224 \<Longrightarrow> 
-  take 32 (to_bl (of_bl (to_bl w1 @ to_bl w2 @ to_bl w3 @ to_bl w4 @ xs) :: 256 word)) =
-   take 32 (to_bl w1 @ to_bl w2 @ to_bl w3 @ to_bl w4)"
-  by (simp add: word_rep_drop)
-
-lemma word_rcat_div_rep0:
-  "length xs = 28 \<Longrightarrow>
-  (word_rcat ([a::byte, b, d, e] @ xs)::w256) div (0x100000000000000000000000000000000000000000000000000000000::w256) =
-   word_rcat [a, b, d, e]"
-  apply (subst word_unat.Rep_inject [symmetric])
-  apply (subst unat_div)
-  apply (simp add: )
-  apply (subst two_power_of_224)
-  apply (subst shiftr_div_2n'[symmetric])
-  apply (simp add: word_rcat_bl shiftr_bl)
-  apply (rule arg_cong[where f=of_bl])
-  apply (simp add: take_32_of_w256 size_rcat_lem)
-  done
-
+text \<open>Following lemma is unsued, consider deleting.\<close>
 lemma take_to_bl_of_bl_word_list:
   fixes w::"'b::len0 word"
     and w'::"'a::len0 word"
     and xs :: "bool list"
   shows
- "length xs = len_of TYPE('b) - len_of TYPE('a) \<Longrightarrow>
+ "length xs = LENGTH('b) - LENGTH('a) \<Longrightarrow>
   w = of_bl (to_bl w' @ xs) \<Longrightarrow>
-  len_of TYPE('b) > len_of TYPE('a) \<Longrightarrow>
-  take (len_of TYPE('a))  (to_bl w) =
-   take (len_of TYPE('a)) (to_bl w')"
+  LENGTH('b) > LENGTH('a) \<Longrightarrow>
+  take LENGTH('a) (to_bl w) =
+   take LENGTH('a) (to_bl w')"
   by (simp add: word_rep_drop)
 
 lemma take_32_concat_to_bl_word_rsplit:
@@ -454,7 +408,6 @@ lemma word_rcat_word_rsplit_div_rep0:
   (word_rcat (word_rsplit (w::32 word) @ (xs::byte list))::w256) div (0x100000000000000000000000000000000000000000000000000000000::w256) =
    word_rcat (word_rsplit w :: byte list)"
   apply (subst word_unat.Rep_inject [symmetric])
-  using [[show_types]]
   apply (subst unat_div)
   apply (simp add: )
   apply (subst two_power_of_224)
@@ -468,91 +421,45 @@ lemma w256_mask_32:
   "(0xFFFFFFFF::w256) = mask 32"
   by (simp add: mask_def)
 
-lemma
+lemma unat_ucast:
+  assumes "LENGTH('a) \<le> LENGTH('b)"
+  shows "unat (UCAST ('a::len0\<rightarrow>'b::len) x) = unat x"
+  unfolding ucast_def unat_def
+  apply (subst int_word_uint)
+  apply (subst mod_pos_pos_trivial)
+    apply simp
+   apply (rule lt2p_lem)
+  apply (rule assms)
+   apply simp
+  done
+
+lemma ucast_le_ucast:
+  "LENGTH('a) \<le> LENGTH('b) \<Longrightarrow> (UCAST('a::len0\<rightarrow>'b::len) x \<le> (ucast y)) = (x \<le> y)"
+  by (simp add: word_le_nat_alt unat_ucast)
+
+lemma ucast_frm_32_le_mask_32:
+ "UCAST(32\<rightarrow>256) z \<le> mask 32"
+  apply (subgoal_tac "mask 32 = UCAST(32\<rightarrow>256) (mask 32)")
+   apply (simp add: ucast_le_ucast mask_32_max_word)
+  apply eval
+  done
+
+lemma dispatcher_hash_extract:
  "length xs = 28 \<Longrightarrow>
-0xFFFFFFFF && word_of_int (uint (word_rcat (bytestr (z::32 word) @ xs) :: w256) div
+  0xFFFFFFFF && word_of_int (uint (word_rcat (bytestr (z::32 word) @ xs) :: w256) div
       0x100000000000000000000000000000000000000000000000000000000) =
     (word_rcat (bytestr z)::w256)"
   apply (simp add: bytestr_def)
-   apply(rule subst[  where P="\<lambda>x. _ AND word_of_int x = _"])
-  apply (rule uint_div[where x="word_rcat
-         (word_rsplit z @ xs)" and y="26959946667150639794667015087019630673637144422540572481103610249216::w256", simplified])
-(* Better proof but need to prove somehing about the cast: 
+  apply(rule subst[where P="\<lambda>x. _ AND word_of_int x = _"])
+  apply (rule uint_div[where x="word_rcat (word_rsplit z @ xs)"
+        and y="0x100000000000000000000000000000000000000000000000000000000::w256", simplified])
   apply (subst word_rcat_word_rsplit_div_rep0; simp)
   apply (simp add: w256_mask_32)
-    apply (subst word_bw_comms(1))
+  apply (subst word_bw_comms(1))
   apply (simp add: and_mask_eq_iff_le_mask)
   apply (simp add: word_rcat_rsplit_ucast)
-  apply (simp add: ucast_def)
-  using [[show_types,show_consts]]
-*)
-  apply (simp add: word_rcat_rsplit_max)
-  apply(subgoal_tac "\<exists>a b d e. word_rsplit (z::32 word) = [a::byte,b,d,e]")
-    apply(clarsimp simp: )
-   apply (simp add: word_rcat_div_rep0[simplified])
-  apply (simp add: w256_mask_32)
-    apply (subst word_bw_comms(1))
-    apply (simp add: and_mask_eq_iff_le_mask)
-   apply (simp add: word_rcat_rsplit_max)
-  --\<open>ugly\<close>
-  sorry
-
-lemma "0xFFFFFFFF &&
-    word_of_int
-     (uint (word_rcat (bytestr (z::32 word) @ take 28 (bytestr (w256 (to::address)))) :: w256) div
-      0x100000000000000000000000000000000000000000000000000000000) =
-    (word_rcat (bytestr z)::w256)"
-  apply (simp add: bytestr_def)
-  find_theorems bit_mask
-  apply(subgoal_tac "\<exists>a b d e. word_rsplit (z::32 word) = [a::byte,b,d,e]")
-	apply(rule subst[OF uint_div[where x="word_rcat
-         (word_rsplit z @  take 28 (word_rsplit (w256 to)))" and y="0x100000000000000000000000000000000000000000000000000000000::w256", simplified],
-          where P="\<lambda>x. _ AND word_of_int x = _"])
-  apply(case_tac "z\<noteq>0")
-  apply(clarsimp)
-    apply(cut_tac a=a and b=b and d=d and e=e and n=28 in word_rcat_div1)
-   apply(subgoal_tac "\<not>([a::byte,b,d,e] = [0,0,0,0::byte])")
-    apply(simp)
-   apply(rule notI)
-    apply(drule sym[where s="word_rsplit _"]; simp)
-    apply(drule word_rsplit_0')
-   apply(simp)+
-   apply(subgoal_tac "word_rcat [1::byte, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] =
-        (0x100000000000000000000000000000000000000000000000000000000::w256)")
-    apply(clarsimp)
-   (* apply(thin_tac _, thin_tac _,thin_tac _, thin_tac _) *)
-   apply(thin_tac "word_rcat _ = _", thin_tac " _ = word_rcat _")
-   apply (subgoal_tac "0xFFFFFFFF = (mask 32::256 word)")
-   apply(simp only:word_bw_comms)
- apply (subst word_bw_comms(1))
-      apply (subst le_mask_imp_and_mask)
-  using word_rcat_rsplit_max
-   apply(rule word_rcat_rsplit_max)
-       apply(simp)
-  defer
-apply(simp add: mask_def)
-apply(thin_tac _)+
-apply(simp add: word_rcat_simps bin_cat_def)
-apply(clarsimp)
-apply(subst (asm) Word_Lemmas_32.word_rsplit_0)
-apply(clarsimp simp add: word_rcat_simps bin_cat_def)
-apply(rule word_rsplit_32)
-
-  
-  oops
-
-
-
-
-lemma blah:
- "(0xFFFFFFFF) &&
-    word_of_int
-     (uint (word_rcat ((a::byte) # b # c # d # take 28 (word_rsplit (w256 (to::address)))) :: w256) div
-    26959946667150639794667015087019630673637144422540572481103610249216) =
-    (word_rcat ((a::byte) # b # c # d # [])::w256)"
-  find_theorems bit_mask
-  apply word_bitwise
-  sorry
+  apply (simp add: ucast_frm_32_le_mask_32)
+  done
 
 theorem verify_basictoken_return:
   notes
@@ -622,8 +529,9 @@ shows
          apply (solves \<open>simp add: word_rcat_simps\<close>)
   find_theorems read_word_from_bytes
          apply (simp add: word_rcat_simps)
-        apply (simp add:  len_bytestr_simps)
-  apply (subst (asm) blah, simp add: word_rcat_simps)
+  apply (simp add:  len_bytestr_simps)
+        apply (subst (asm) dispatcher_hash_extract)
+         apply (simp add: len_bytestr_simps)
   oops
         apply (simp add: bytestr_def min_def word_rcat_simps)
   using bit_mask_rev
