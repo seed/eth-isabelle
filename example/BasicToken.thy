@@ -381,7 +381,76 @@ lemma two_power_of_224:
  "(0x100000000000000000000000000000000000000000000000000000000::nat) = 2^224"
   by eval
 
-text \<open>Following lemma is unsued, consider deleting.\<close>
+
+(* *** word_rcat shifts more generally *** *)
+lemma concat_map_take :
+"\<forall>x \<in> set xs. length (f x) = n \<Longrightarrow>
+List.concat (map f (take k xs)) = take (k*n) (List.concat (map f xs))"
+  apply(induct xs arbitrary: k, simp)
+  apply(case_tac k, simp)
+  apply clarsimp
+  done
+
+
+lemma word_rcat_shiftr_take : 
+"length ys = 32 \<Longrightarrow> k \<le> 32 \<Longrightarrow>
+ word_rcat (ys::byte list) >> 8 * k = (word_rcat (take (length ys - k) ys) ::w256)"
+  apply (simp add: word_rcat_bl shiftr_bl)
+  apply (simp add: word_rep_drop size_rcat_lem)
+  apply(subst concat_map_take[where n=8])
+   apply clarsimp
+  apply(subst diff_mult_distrib)
+  apply simp
+  apply(subst Groups.ab_semigroup_mult_class.mult.commute)
+  by(rule refl)
+
+lemma word_rcat_append_shiftr :
+  "length ys + length xs = 32 \<Longrightarrow>
+   word_rcat ((ys::byte list) @ xs) >> (8 * length xs) = (word_rcat ys :: w256)"
+  by(subst word_rcat_shiftr_take, simp_all)
+(* ************************************************ *)  
+
+lemma take_32_of_w256:
+  fixes w1::byte and w2 :: byte and w3 :: byte and w4 :: byte and xs :: "bool list"
+  shows
+ "length xs = 224 \<Longrightarrow> 
+  take 32 (to_bl (of_bl (to_bl w1 @ to_bl w2 @ to_bl w3 @ to_bl w4 @ xs) :: 256 word)) =
+   take 32 (to_bl w1 @ to_bl w2 @ to_bl w3 @ to_bl w4)"
+  by (simp add: word_rep_drop)
+
+lemma word_rcat_div_rep0:
+  "length xs = 28 \<Longrightarrow>
+  (word_rcat ([a::byte, b, d, e] @ xs)::w256) div (0x100000000000000000000000000000000000000000000000000000000::w256) =
+   word_rcat [a, b, d, e]"
+  apply (subst word_unat.Rep_inject [symmetric])
+  apply (subst unat_div)
+  apply (simp add: )
+  apply (subst two_power_of_224)
+  apply (subst shiftr_div_2n'[symmetric])
+  apply(subgoal_tac "unat (word_rcat (a # b # d # e # xs) >> 224) = 
+                     unat (word_rcat ([a, b, d, e] @ xs) >> 8 * length xs)")
+   apply(erule ssubst, subst word_rcat_append_shiftr)
+    apply simp
+   apply(rule refl)
+  by simp
+
+lemma word_rcat_word_rsplit_div_rep0:
+  "length xs = 28 \<Longrightarrow>
+  (word_rcat (word_rsplit (w::32 word) @ (xs::byte list))::w256) div (0x100000000000000000000000000000000000000000000000000000000::w256) =
+   word_rcat (word_rsplit w :: byte list)"
+  apply (subst word_unat.Rep_inject [symmetric])
+  apply (subst unat_div)
+  apply (simp add: )
+  apply (subst two_power_of_224)
+  apply (subst shiftr_div_2n'[symmetric])
+  apply(subgoal_tac "unat (word_rcat (word_rsplit w @ xs) >> 224) = 
+                     unat (word_rcat (word_rsplit w @ xs) >> 8 * length xs)")
+   apply(erule ssubst, subst word_rcat_append_shiftr)
+    apply(simp add: length_word_rsplit_4)
+   apply(rule refl)
+  by simp
+
+(* ? ? ? ?
 lemma take_to_bl_of_bl_word_list:
   fixes w::"'b::len0 word"
     and w'::"'a::len0 word"
@@ -416,6 +485,8 @@ lemma word_rcat_word_rsplit_div_rep0:
   apply (rule arg_cong[where f=of_bl])
   apply (simp add: take_32_concat_to_bl_word_rsplit)
   done
+*)
+
 
 lemma w256_mask_32:
   "(0xFFFFFFFF::w256) = mask 32"
