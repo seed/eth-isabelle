@@ -195,7 +195,7 @@ inductive triple_inst_arith :: "network \<Rightarrow> pred \<Rightarrow> pos_ins
       (program_counter (n + 1) \<and>* continuing \<and>*
        stack_height (Suc h) \<and>* stack h (iszero_stack w) \<and>*
        gas_pred (g - Gverylow) \<and>* rest)"
-(*| inst_exp :(*Written from lem - syntax error*)
+| inst_exp :(*Taken from lem *)
     "triple_inst_arith net
       (\<langle> h \<le> 1022 \<and> Gverylow \<le> g\<rangle> \<and>*
        continuing \<and>* program_counter n \<and>*
@@ -203,8 +203,8 @@ inductive triple_inst_arith :: "network \<Rightarrow> pred \<Rightarrow> pos_ins
 			 gas_pred g \<and>* rest)
       (n, Arith EXP)
       (program_counter (n + 1) \<and>* continuing \<and>*
-       stack_height (Suc h) \<and>* stack h (word_of_int (word_exp (uint v) (unat w))) \<and>*
-       gas_pred (g - (Gexp + if w = 0 then 0 else Gexbyte net * (1 + log256floor (uint w:: int)))) \<and>* rest)"*)
+       stack_height (Suc h) \<and>* stack h ((word_of_int (word_exp (uint v) (unat w)))) \<and>*
+       gas_pred (g - (Gexp + (if w = 0 then 0 else Gexbyte net * (1 + log256floor (uint w:: int))))) \<and>* rest)"
 
 fun bits_2_1_verylow:: "bits_inst \<Rightarrow> w256 \<Rightarrow> w256 \<Rightarrow> w256" where
  "bits_2_1_verylow BYTE = get_byte"

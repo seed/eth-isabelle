@@ -864,7 +864,31 @@ shows
               apply(split if_split, rule conjI, rule impI)
                apply(inst_sound_set_eq, set_solve)
               apply(inst_sound_set_eq, set_solve)
-             apply(inst_sound_set_eq simp: iszero_stack_def, set_solve)
+               apply(inst_sound_set_eq simp: iszero_stack_def, set_solve)
+(* Arith EXP *)
+            apply(split if_split, rule conjI, rule impI)
+  apply( simp add: triple_inst_sem_def program_sem.simps as_set_simps,
+      clarify,
+        sep_simp simp: evm_sep; simp,
+          simp split: instruction_result.splits)
+  apply ( simp add: stateelm_means_simps stateelm_equiv_simps,
+          simp add: vctx_next_instruction_def,
+          clarsimp simp add: instruction_simps)
+  apply (rule conjI)
+            apply(split if_split, rule conjI, rule impI)
+                 apply ( clarsimp simp add: instruction_simps )
+  apply ((sep_simp simp: evm_sep)+, simp add: stateelm_means_simps stateelm_equiv_simps)
+  apply (erule_tac P="(_ \<and>* _)" in back_subst)
+  apply (set_solve)
+            apply(split if_split, rule conjI, rule impI)
+                 apply ( clarsimp simp add: instruction_simps )
+                apply ( clarsimp simp add: instruction_simps )
+                 apply ( clarsimp simp add: instruction_simps )
+            apply(split if_splits)
+                 apply ( clarsimp simp add: instruction_simps )
+  apply ((sep_simp simp: evm_sep)+, simp add: stateelm_means_simps stateelm_equiv_simps)
+  apply clarsimp
+(* Breaks here --  BIT .. *)
             apply(erule triple_inst_bits.cases; clarsimp)
                 apply(inst_sound_set_eq, set_solve)
                apply(inst_sound_set_eq, set_solve)

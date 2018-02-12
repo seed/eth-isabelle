@@ -618,6 +618,28 @@ shows
   apply (simp add:  len_bytestr_simps)
         apply (subst (asm) dispatcher_hash_extract)
          apply (simp add: len_bytestr_simps)
+        apply (solves \<open>simp add: bytestr_def ;simp add: word_rcat_simps\<close>)
+  apply (simp add: word_rcat_simps len_bytestr_simps)
+      apply (simp add: word_rcat_simps len_bytestr_simps)
+      apply (subst (asm) dispatcher_hash_extract)
+  apply (simp add: len_bytestr_simps)
+
+   apply (block_vcg2)
+  apply -
+  apply (simp add: word_rcat_simps len_bytestr_simps)
+      apply (subst (asm) dispatcher_hash_extract)
+        apply (simp add: len_bytestr_simps)
+        apply (solves \<open>simp add: bytestr_def ;simp add: word_rcat_simps\<close>)
+
+        apply (subst (asm) dispatcher_hash_extract)
+        apply (simp add: len_bytestr_simps)
+        apply (simp)
+   apply (block_vcg2)
+  apply -
+
+   apply (block_vcg2)
+  apply -
+  
   oops
         apply (simp add: bytestr_def min_def word_rcat_simps)
   using bit_mask_rev
