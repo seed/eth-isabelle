@@ -518,9 +518,7 @@ lemma ucast_32_256_minus_1_eq:
   apply (subst int_word_uint)
   apply (subst mod_pos_pos_trivial)
     apply simp
-   apply uint_arith
-   apply (erule less_trans)
-   apply simp
+   apply (clarsimp split: uint_splits)
   apply (simp add: minus_1_w32)
   done
 
@@ -550,7 +548,7 @@ lemma dispatcher_hash_extract:
   done
 
 theorem verify_basictoken_return:
-  notes
+notes
   bit_mask_rev[simp]
   address_mask_ucast[simp] address_mask_ucast[simplified word_bool_alg.conj.commute, simp]
   ucast_and_w256_drop[simp]
