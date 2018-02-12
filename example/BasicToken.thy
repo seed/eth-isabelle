@@ -379,7 +379,7 @@ lemma len_bytestr_simps:
 
 lemma two_power_of_224:
  "(0x100000000000000000000000000000000000000000000000000000000::nat) = 2^224"
-  by eval
+  by simp
 
 
 (* *** word_rcat shifts more generally *** *)
@@ -508,11 +508,28 @@ lemma ucast_le_ucast:
   "LENGTH('a) \<le> LENGTH('b) \<Longrightarrow> (UCAST('a::len0\<rightarrow>'b::len) x \<le> (ucast y)) = (x \<le> y)"
   by (simp add: word_le_nat_alt unat_ucast)
 
+lemma minus_1_w32:
+  " (-1::32 word) = 0xffffffff"
+  by simp
+
+lemma ucast_32_256_minus_1_eq:
+  "UCAST(32 \<rightarrow> 256) (- 1) = 0xFFFFFFFF"
+  apply (simp add: ucast_def unat_arith_simps unat_def)
+  apply (subst int_word_uint)
+  apply (subst mod_pos_pos_trivial)
+    apply simp
+   apply uint_arith
+   apply (erule less_trans)
+   apply simp
+  apply (simp add: minus_1_w32)
+  done
+
 lemma ucast_frm_32_le_mask_32:
  "UCAST(32\<rightarrow>256) z \<le> mask 32"
   apply (subgoal_tac "mask 32 = UCAST(32\<rightarrow>256) (mask 32)")
    apply (simp add: ucast_le_ucast mask_32_max_word)
-  apply eval
+  apply (simp add: mask_def)
+  apply (simp add: ucast_32_256_minus_1_eq)
   done
 
 lemma dispatcher_hash_extract:
