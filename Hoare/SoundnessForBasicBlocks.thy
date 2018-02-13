@@ -840,6 +840,38 @@ lemma inst_suicide_sem:
   apply(simp add: mask_def)
  done
 
+
+
+lemma word_exp_eq_pow_mod :
+"word_exp a n = (a ^ n) mod (( 2 :: int) ^( 256 :: nat))"
+  apply(induct n arbitrary: a rule: less_induct)
+  apply(simp (no_asm) add: word_exp.simps)
+  apply(case_tac x, simp)
+  apply(rename_tac k, clarsimp simp: Let_def)
+  apply(subst mod_mult_eq[THEN sym])
+  apply(subst mod_mod_trivial)
+  apply(subst mod_mult_eq[THEN sym])
+  apply(subst mod_mod_trivial)
+  apply(subst mod_mult_eq)
+  apply(subst mod_mult_eq)
+  apply(rule_tac f="\<lambda>x. x mod _" in arg_cong)
+  apply(case_tac "even k")
+   apply(subst even_succ_div_two[where 'a=nat, simplified], assumption)+
+   apply(subst odd_iff_mod_2_eq_one[THEN iffD1], simp)
+   apply simp
+   apply(rule disjI2)
+   apply(subst power_add[THEN sym])
+   apply(subst div_plus_div_distrib_dvd_left[THEN sym], assumption)
+   apply simp
+  apply(subst even_iff_mod_2_eq_zero[THEN iffD1], simp)
+  apply(subst semigroup_mult_class.mult.assoc)
+  apply(subst power_add[THEN sym])
+  apply(subst div_plus_div_distrib_dvd_left[THEN sym], simp)
+  apply simp
+  done
+
+
+
 lemma triple_inst_soundness:
 notes
   if_split[split del]
@@ -866,6 +898,7 @@ shows
               apply(inst_sound_set_eq, set_solve)
                apply(inst_sound_set_eq simp: iszero_stack_def, set_solve)
 (* Arith EXP *)
+
             apply(split if_split, rule conjI, rule impI)
   apply( simp add: triple_inst_sem_def program_sem.simps as_set_simps,
       clarify,
@@ -887,7 +920,8 @@ shows
             apply(split if_splits)
                  apply ( clarsimp simp add: instruction_simps )
   apply ((sep_simp simp: evm_sep)+, simp add: stateelm_means_simps stateelm_equiv_simps)
-  apply clarsimp
+               apply clarsimp
+
 (* Breaks here --  BIT .. *)
             apply(erule triple_inst_bits.cases; clarsimp)
                 apply(inst_sound_set_eq, set_solve)
