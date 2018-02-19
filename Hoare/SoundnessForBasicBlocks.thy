@@ -898,31 +898,10 @@ shows
               apply(inst_sound_set_eq, set_solve)
                apply(inst_sound_set_eq simp: iszero_stack_def, set_solve)
 (* Arith EXP *)
-
             apply(split if_split, rule conjI, rule impI)
-  apply( simp add: triple_inst_sem_def program_sem.simps as_set_simps,
-      clarify,
-        sep_simp simp: evm_sep; simp,
-          simp split: instruction_result.splits)
-  apply ( simp add: stateelm_means_simps stateelm_equiv_simps,
-          simp add: vctx_next_instruction_def,
-          clarsimp simp add: instruction_simps)
-  apply (rule conjI)
-            apply(split if_split, rule conjI, rule impI)
-                 apply ( clarsimp simp add: instruction_simps )
-  apply ((sep_simp simp: evm_sep)+, simp add: stateelm_means_simps stateelm_equiv_simps)
-  apply (erule_tac P="(_ \<and>* _)" in back_subst)
-  apply (set_solve)
-            apply(split if_split, rule conjI, rule impI)
-                 apply ( clarsimp simp add: instruction_simps )
-                apply ( clarsimp simp add: instruction_simps )
-                 apply ( clarsimp simp add: instruction_simps )
-            apply(split if_splits)
-                 apply ( clarsimp simp add: instruction_simps )
-  apply ((sep_simp simp: evm_sep)+, simp add: stateelm_means_simps stateelm_equiv_simps)
-               apply clarsimp
-
-(* Breaks here --  BIT .. *)
+              apply(inst_sound_set_eq, set_solve)
+              apply(inst_sound_set_eq, set_solve)
+(* Arith  BIT *)
             apply(erule triple_inst_bits.cases; clarsimp)
                 apply(inst_sound_set_eq, set_solve)
                apply(inst_sound_set_eq, set_solve)
@@ -1537,7 +1516,7 @@ lemma memory_range_elms_same_addr:
   apply(case_tac zs, simp)
   apply fastforce
   done
-    
+
 lemma pc_after_inst:
 notes
   if_split[split del]
@@ -1695,6 +1674,23 @@ apply(after_arith_if)
              {StackElm (h, w)} - {GasElm g}) \<union> {StackElm (h, iszero_stack w)} \<union>
              {GasElm (g-Gverylow)} \<union> {PcElm (n+1)} " in exI)
            apply(easy_case_pc_after_inst)
+    (* EXP *)
+            apply(find_q_pc_after_inst)
+            apply(rule_tac x="(s - {PcElm n} - {StackHeightElm (Suc (Suc h))} -
+             {StackElm (Suc h, v)} - {StackElm (h, w)} - {GasElm g}) \<union> {StackElm (h, (word_of_int (word_exp (uint v) (unat w))))} \<union>
+             {GasElm (g- (Gexp + (if w = 0 then 0 else Gexpbyte neta * (1 + log256floor (uint w)))))} \<union> {StackHeightElm (Suc h)} \<union> {PcElm (n+1)} " in exI)
+            apply(after_arith_if)
+                apply (simp add: word_exp.simps) 
+                apply(solves \<open>drule (2) only_one_stack_elm, simp\<close>)
+    					 apply(solves \<open>drule (2) only_one_stack_elm, simp\<close>)
+    					apply (case_tac t; clarsimp)
+    					apply (drule (1) only_one_gas[rotated -1])
+    					  apply (rule ordered_comm_monoid_add_class.add_pos_nonneg ; clarsimp simp: Gexpbyte_def log256floor_ge_0 split: if_split)
+    					 apply assumption
+    					apply simp
+    				 apply(auto)[1]
+    				apply (uniq_state_elm_quasi)
+    				apply(case_tac "ha=Suc h"; simp)
     (**BITS**)
     			apply(erule triple_inst_bits.cases; clarsimp)
     (*NOT*)
