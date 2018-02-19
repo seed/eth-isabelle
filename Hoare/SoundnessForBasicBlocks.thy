@@ -899,8 +899,8 @@ shows
                apply(inst_sound_set_eq simp: iszero_stack_def, set_solve)
 (* Arith EXP *)
             apply(split if_split, rule conjI, rule impI)
-              apply(inst_sound_set_eq, set_solve)
-              apply(inst_sound_set_eq, set_solve)
+               apply(inst_sound_set_eq simp: word_exp.simps, set_solve)
+               apply(inst_sound_set_eq simp: word_exp_eq_pow_mod, set_solve)
 (* Arith  BIT *)
             apply(erule triple_inst_bits.cases; clarsimp)
                 apply(inst_sound_set_eq, set_solve)
@@ -1680,7 +1680,6 @@ apply(after_arith_if)
              {StackElm (Suc h, v)} - {StackElm (h, w)} - {GasElm g}) \<union> {StackElm (h, (word_of_int (word_exp (uint v) (unat w))))} \<union>
              {GasElm (g- (Gexp + (if w = 0 then 0 else Gexpbyte neta * (1 + log256floor (uint w)))))} \<union> {StackHeightElm (Suc h)} \<union> {PcElm (n+1)} " in exI)
             apply(after_arith_if)
-                apply (simp add: word_exp.simps) 
                 apply(solves \<open>drule (2) only_one_stack_elm, simp\<close>)
     					 apply(solves \<open>drule (2) only_one_stack_elm, simp\<close>)
     					apply (case_tac t; clarsimp)
@@ -1689,6 +1688,9 @@ apply(after_arith_if)
     					 apply assumption
     					apply simp
     				 apply(auto)[1]
+             apply (simp add: word_exp_eq_pow_mod)
+             apply (simp add: word_exp_eq_pow_mod)
+             apply (simp add: word_exp_eq_pow_mod)
     				apply (uniq_state_elm_quasi)
     				apply(case_tac "ha=Suc h"; simp)
     (**BITS**)

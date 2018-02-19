@@ -546,6 +546,9 @@ lemma dispatcher_hash_extract:
   apply (simp add: word_rcat_rsplit_ucast)
   apply (simp add: ucast_frm_32_le_mask_32)
   done
+method fast_sep_imp_solve uses simp = 
+  (match conclusion  in "triple_blocks _ _ _ _ _"  \<Rightarrow> \<open>succeed\<close> | 
+    ( sep_imp_solve2 simp:simp, fast_sep_imp_solve simp: simp) )
 
 theorem verify_basictoken_return:
 notes
@@ -640,6 +643,95 @@ shows
    apply (block_vcg2)
   apply -
   
+   apply (  split_conds,
+  ((blocks_rule_vcg; (rule refl)?), triple_seq_vcg)
+  )
+                  apply -
+  apply (sep_imp_solve2)
+  apply clarsimp
+  apply (simp add: word_rcat_simps )
+  apply (sep_imp_solve2)+
+                  apply (simp add: word_rcat_simps )
+  apply (fast_sep_imp_solve simp: log256floor.simps word_rcat_simps)
+   apply (  split_conds,
+  ((blocks_rule_vcg; (rule refl)?), triple_seq_vcg)
+  )
+                  apply -
+  apply (fast_sep_imp_solve simp: log256floor.simps word_rcat_simps)
+  apply (clarsimp simp add: word_rcat_simps log256floor.simps len_bytestr_simps)
+   apply (block_vcg2)
+  apply -
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                      apply (clarsimp simp add: word_rcat_simps log256floor.simps len_bytestr_simps)
+                      apply (rule conjI)
+                      apply (sep_cancel)+
+  oops
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (fast_sep_imp_solve simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (clarsimp simp add: word_rcat_simps log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+                      apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (sep_imp_solve2 simp: log256floor.simps)
+  apply (clarsimp simp add: word_rcat_simps )
+  apply (sep_imp_solve2 simp:)
+  apply (sep_imp_solve2 simp:)
+  apply -
+  apply -
   oops
         apply (simp add: bytestr_def min_def word_rcat_simps)
   using bit_mask_rev
