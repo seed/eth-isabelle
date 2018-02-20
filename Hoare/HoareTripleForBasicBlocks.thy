@@ -195,7 +195,7 @@ inductive triple_inst_arith :: "network \<Rightarrow> pred \<Rightarrow> pos_ins
       (program_counter (n + 1) \<and>* continuing \<and>*
        stack_height (Suc h) \<and>* stack h (iszero_stack w) \<and>*
        gas_pred (g - Gverylow) \<and>* rest)"
-| inst_arith_exp :(*Taken from lem *)
+| inst_arith_exp:
     "triple_inst_arith net
       (\<langle> h \<le> 1022 \<and> (Gexp + (if w = 0 then 0 else Gexpbyte net * (1 + log256floor (uint w:: int)))) \<le> g\<rangle> \<and>*
        continuing \<and>* program_counter n \<and>*
@@ -205,6 +205,24 @@ inductive triple_inst_arith :: "network \<Rightarrow> pred \<Rightarrow> pos_ins
       (program_counter (n + 1) \<and>* continuing \<and>*
        stack_height (Suc h) \<and>* stack h (word_of_int ((uint v ^ unat w) mod (2 ^  256))) \<and>*
        gas_pred (g - (Gexp + (if w = 0 then 0 else Gexpbyte net * (1 + log256floor (uint w:: int))))) \<and>* rest)"
+  | inst_arith_sha3:
+    "triple_inst_arith net (\<langle> h \<le> 1022 \<and> unat len = length xs \<rangle> \<and>*
+       continuing \<and>* program_counter k \<and>*   
+       stack_height (h+2) \<and>*
+       stack (h+1) memaddr \<and>*
+       stack h len \<and>*
+       memory_usage memu \<and>*
+       memory_range memaddr xs \<and>*
+       gas_pred g \<and>*
+       rest)
+     (k, Arith SHA3)
+    (continuing \<and>* program_counter (k + 1) \<and>*
+     stack_height (h + 1) \<and>*
+     stack h (keccak xs) \<and>*
+     memory_range memaddr xs \<and>*
+     memory_usage (M memu memaddr 64) \<and>*
+     gas_pred (g - Gsha3 - Gsha3word * ((uint len) div 32) + Cmem memu - Cmem (M memu memaddr 64)) \<and>*
+     rest)"
 
 fun bits_2_1_verylow:: "bits_inst \<Rightarrow> w256 \<Rightarrow> w256 \<Rightarrow> w256" where
  "bits_2_1_verylow BYTE = get_byte"

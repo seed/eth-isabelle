@@ -339,17 +339,17 @@ method sep_imp_solve2 uses simp =
  | solves \<open>match conclusion in "block_lookup _ _ = Some _"  \<Rightarrow> \<open>simp add:word_rcat_simps\<close>
              , (rule conjI, (rule refl)+)\<close>
  | solves \<open>simp\<close>
- | solves \<open>(clarsimp?, ((((sep_cancel, clarsimp?)+)|simp add:simp|rule conjI)+)[1])\<close>
- | solves \<open>(clarsimp?, ((((sep_cancel, clarsimp?)+)|(clarsimp split:if_split simp: simp)|rule conjI)+)[1])\<close>
+ | solves \<open>(clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:simp|rule conjI)+)[1])\<close>
+ | solves \<open>(clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|(clarsimp split:if_split simp: simp)|rule conjI)+)[1])\<close>
  | solves \<open>(clarsimp split:if_splits simp:word_rcat_simps) ; sep_imp_solve2 \<close>
 
 method split_conds =
  (split if_split_asm; clarsimp simp add: word_rcat_simps)?
 
-method block_vcg2=
+method block_vcg2 uses simp=
   split_conds,
   ((blocks_rule_vcg; (rule refl)?), triple_seq_vcg),
-  (sep_imp_solve2)+,
+  (sep_imp_solve2 simp:simp)+,
   (solves \<open>split_conds\<close>)?
 
 definition w256 :: "'a::len0 word \<Rightarrow> w256"  where
@@ -565,20 +565,26 @@ assumes blk_num: "bn > 2463000"
 and net: "at_least_eip150 net"
 shows
 "\<exists>r. triple net
-  (program_counter 0 ** stack_height 0 **
+  (\<langle>balances_mapping anyaddr \<noteq> balances_mapping sender \<and>
+    balances_mapping anyaddr \<noteq> balances_mapping to \<rangle> **
+   program_counter 0 ** stack_height 0 **
    sent_data (bytestr transfer_hash @ bytestr (w256 to) @ bytestr val) **
    sent_value 0 ** caller sender ** blk_num bn **
    memory_usage 0 ** continuing ** gas_pred 40000 **
    storage (balances_mapping sender) balance_frm **
    storage (balances_mapping to) balance_to **
+   storage (balances_mapping anyaddr) balance_any **
    account_existence sender sender_ex  **
    account_existence to to_ex **
-   memory (word_rcat [64::byte]) (bytestr_to_w256 [x]) **
-   memory (word_rcat [96::byte]) (bytestr_to_w256 [y]))
+   memory (0::w256) m0x0 **
+   memory (0x20::w256) m0x20 **
+   memory (0x40::w256) (bytestr_to_w256 [x]) **
+   memory (0x60::w256) (bytestr_to_w256 [y]))
   blocks_basictoken
   (let c = success_cond to val balance_frm balance_to in
    storage (balances_mapping sender) (if c then balance_frm - val else balance_frm) **
-   storage (balances_mapping to) (if c then balance_to + val else balance_to) ** r)"
+   storage (balances_mapping to) (if c then balance_to + val else balance_to) ** 
+   storage (balances_mapping anyaddr) balance_any ** r)"
   apply (insert blk_num[simplified word_less_nat_alt] net)
   apply (simp add: Let_def)
   apply (clarsimp simp: success_cond_def split: if_splits; safe)
@@ -616,7 +622,6 @@ shows
       
   apply (solves \<open>simp add: word_rcat_simps\<close>)
          apply (solves \<open>simp add: word_rcat_simps\<close>)
-  find_theorems read_word_from_bytes
          apply (simp add: word_rcat_simps)
   apply (simp add:  len_bytestr_simps)
         apply (subst (asm) dispatcher_hash_extract)
@@ -669,8 +674,14 @@ shows
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
                       apply (clarsimp simp add: word_rcat_simps log256floor.simps len_bytestr_simps)
-                      apply (rule conjI)
-                      apply (sep_cancel)+
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+(* SHA3 *)
   oops
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
@@ -776,6 +787,7 @@ shows
   apply (sep_imp_solve2)
   apply (sep_imp_solve2)
   apply (sep_imp_solve2)
+
   oops
 
   split_conds,

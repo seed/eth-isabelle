@@ -839,9 +839,169 @@ lemma inst_suicide_sem:
   apply(subst ucast_ucast_mask)
   apply(simp add: mask_def)
  done
+(* FIXME: fix gas consumption post and preconditions, perhaps use abbreviation?
+  Check yellow paper.
+ *)
+lemma inst_arith_sha3_sem:
+  "triple_inst_sem net
+        (\<langle> h \<le> 1022 \<and> unat len = length xs \<and> memu \<ge> 0 \<and> g \<ge> Gsha3 + Gsha3word * ((uint len + 31) div 32) - Cmem memu + Cmem (M memu memaddr len)\<rangle> \<and>*
+         continuing \<and>*
+         program_counter k \<and>*
+         stack_height (Suc (Suc h)) \<and>*
+         stack (Suc h) memaddr \<and>*
+         stack h len \<and>* memory_usage memu \<and>* memory_range memaddr xs \<and>* gas_pred g \<and>* rest)
+        (k, Arith SHA3)
+        (continuing \<and>*
+         program_counter (k + 1) \<and>*
+         stack_height (Suc h) \<and>*
+         stack h (keccak xs) \<and>*
+         memory_range memaddr xs \<and>*
+         memory_usage (M memu memaddr len) \<and>*
+         gas_pred (g - Gsha3 - Gsha3word * ((uint len + 31) div 32) + Cmem memu - Cmem (M memu memaddr len)) \<and>*
+         rest)"
+ apply(simp add: triple_inst_sem_def)
+ apply(simp add: program_sem.simps  as_set_simps instruction_sem_def)
+ apply(clarify)
+ apply(case_tac presult; clarsimp)
+   defer
+   apply(simp add: as_set_simps)
+   apply(sep_simp simp: continuing_sep; clarsimp)
+ apply(sep_simp simp: pure_sep)
+ 			apply(sep_simp simp: evm_sep, simp?, (erule conjE)?)+
+ 				 apply(simp add: instruction_simps )
+ 			apply(simp add: stateelm_means_simps stateelm_equiv_simps)
+ 				apply(simp add: memory_range_sep memory_range_elms_set_simps)
+ apply(clarify)
+ apply(clarsimp)
+ 			apply(simp add: instruction_simps Let_def max_absorb2)
+ 				apply(simp add: stateelm_means_simps stateelm_equiv_simps)
+ 				apply(simp add:  memory_range_elms_cut_memory)
+ 	apply(rule conjI)
+ 	 defer
+  apply clarsimp
+ 	apply(rule conjI,clarsimp?)+
+ 	apply(erule_tac P="(_ \<and>* _)" in back_subst)
+  apply (simp add: max_absorb1)
+     apply(set_solve)
+  apply -
+    apply (simp add: memory_range_elms_in_vctx contexts_as_set_def  )
+    apply clarsimp
+    apply (drule subsetD, assumption)
+  apply (clarsimp simp: variable_ctx_as_set_def)
+  apply arith
+   
+   apply( simp add: as_set_simps memory_range_elms_set_simps)[1]
+ 		 apply (clarsimp simp:  as_set_simps)
+ 	find_theorems memory_range cut_memory
+ 		 apply( simp add: as_set_simps memory_range_elms_set_simps)[1]
+ 		 apply (rule set_eqI; clarsimp)
+ 		 apply (rule iffI; clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+  apply (rule conjI)
+ 		  apply ( clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+ 		  apply (erule disjE, clarsimp)
+  apply clarsimp+
+ 		  apply (erule disjE)+
+  apply clarsimp+
+ 		  apply (erule disjE)+
+  apply clarsimp+
+ 		  apply (erule disjE)+
+  apply clarsimp+
+ 		  apply (erule disjE)+
+  apply clarsimp+
+ 		  apply (erule disjE)+
+  apply clarsimp+
+ 		  apply (erule disjE)+
+  apply clarsimp+
+  apply (rule  conjI; clarsimp?)
+ 	oops
+ 			 apply(auto simp add: as_set_simps )[1]
+ 			apply(thin_tac "(_ \<and>* _) _")
+  		apply(subst (asm) subset_eq)
+  		apply(simp add: Ball_def)
+  		apply(clarsimp simp add: memory_range_elms_set_simps)
+  			apply(drule_tac x=x in spec, simp)
+  		apply(drule memory_elm_in_memory_range_elms)
+  			apply(clarsimp)
+  		apply(simp add: stateelm_means_simps stateelm_equiv_simps)
 
-
-
+(*   apply ( simp add: triple_inst_sem_def program_sem.simps as_set_simps)
+  apply( clarify)
+  apply( sep_simp simp: evm_sep; simp)
+  apply( simp split: instruction_result.splits)
+  apply( simp add: stateelm_means_simps stateelm_equiv_simps)
+  apply( simp add: vctx_next_instruction_def )
+              apply( clarsimp simp add: instruction_simps Let_def)
+  apply (rule conjI; clarsimp split:if_split_asm)
+  apply( (sep_simp simp: evm_sep)+)
+                 apply( simp add: stateelm_means_simps stateelm_equiv_simps)
+  apply (rule conjI)
+  apply( erule_tac P="(_ \<and>* _)" in back_subst)
+              apply(inst_sound_set_eq, set_solve)
+ *)
+  sorry
 lemma word_exp_eq_pow_mod :
 "word_exp a n = (a ^ n) mod (( 2 :: int) ^( 256 :: nat))"
   apply(induct n arbitrary: a rule: less_induct)
@@ -900,8 +1060,11 @@ shows
 (* Arith EXP *)
             apply(split if_split, rule conjI, rule impI)
                apply(inst_sound_set_eq simp: word_exp.simps, set_solve)
-               apply(inst_sound_set_eq simp: word_exp_eq_pow_mod, set_solve)
-(* Arith  BIT *)
+              apply(inst_sound_set_eq simp: word_exp_eq_pow_mod, set_solve)
+              apply -
+(* Arith SHA3 *)
+  apply (rule inst_arith_sha3_sem)
+(* BITS ... *)
             apply(erule triple_inst_bits.cases; clarsimp)
                 apply(inst_sound_set_eq, set_solve)
                apply(inst_sound_set_eq, set_solve)
