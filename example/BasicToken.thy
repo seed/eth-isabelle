@@ -546,6 +546,21 @@ lemma dispatcher_hash_extract:
   apply (simp add: word_rcat_rsplit_ucast)
   apply (simp add: ucast_frm_32_le_mask_32)
   done
+
+lemma two_memory_memory_range_eq:
+ "(memory 0 w1 \<and>* memory 0x20 w2 \<and>* R) = (memory_range 0 (word_rsplit w1 @ word_rsplit w2) \<and>* R)"
+proof -
+  have  "(R \<and>* memory 0 w1 \<and>* memory 0x20 w2) = (R \<and>* memory_range 0 (word_rsplit w1 @ word_rsplit w2))"
+   apply(rule ext)
+  apply (rule iffI)
+    apply (sep_cancel)
+     apply (clarsimp simp add: memory_def sep_conj_def)
+    find_theorems memory_range "op @"
+    sorry
+  thus ?thesis
+  by (simp add: ac_simps)
+qed
+
 method fast_sep_imp_solve uses simp = 
   (match conclusion  in "triple_blocks _ _ _ _ _"  \<Rightarrow> \<open>succeed\<close> | 
     ( sep_imp_solve2 simp:simp, fast_sep_imp_solve simp: simp) )
@@ -681,6 +696,23 @@ shows
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (simp, rule conjI)
+                    apply (clarsimp?, order_sep_conj)
+  apply sep_cancel
+  apply sep_cancel
+                    apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+  (* use two_memory_memory_range_eq *)
+                    apply (sep_select_asm 2)
+  apply assumption
+  apply_trace (sep_cancel )
+  apply sep_cancel
+
+  apply ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+)
 (* SHA3 *)
   oops
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
