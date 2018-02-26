@@ -841,10 +841,10 @@ lemma inst_suicide_sem:
  done
 (* FIXME: fix gas consumption post and preconditions, perhaps use abbreviation?
   Check yellow paper.
- *)
+*)
 lemma inst_arith_sha3_sem:
   "triple_inst_sem net
-        (\<langle> h \<le> 1022 \<and> unat len = length xs \<and> memu \<ge> 0 \<and> g \<ge> Gsha3 + Gsha3word * ((uint len + 31) div 32) - Cmem memu + Cmem (M memu memaddr len)\<rangle> \<and>*
+        (\<langle> h \<le> 1022 \<and> unat len = length xs \<and> memu \<ge> 0 \<and> g \<ge> sha3_gas len memu memaddr\<rangle> \<and>*
          continuing \<and>*
          program_counter k \<and>*
          stack_height (Suc (Suc h)) \<and>*
@@ -857,7 +857,7 @@ lemma inst_arith_sha3_sem:
          stack h (keccak xs) \<and>*
          memory_range memaddr xs \<and>*
          memory_usage (M memu memaddr len) \<and>*
-         gas_pred (g - Gsha3 - Gsha3word * ((uint len + 31) div 32) + Cmem memu - Cmem (M memu memaddr len)) \<and>*
+         gas_pred (g - sha3_gas len memu memaddr) \<and>*
          rest)"
  apply(simp add: triple_inst_sem_def)
  apply(simp add: program_sem.simps  as_set_simps instruction_sem_def)
@@ -888,120 +888,8 @@ lemma inst_arith_sha3_sem:
     apply clarsimp
     apply (drule subsetD, assumption)
   apply (clarsimp simp: variable_ctx_as_set_def)
-  apply arith
-   
-   apply( simp add: as_set_simps memory_range_elms_set_simps)[1]
- 		 apply (clarsimp simp:  as_set_simps)
- 	find_theorems memory_range cut_memory
- 		 apply( simp add: as_set_simps memory_range_elms_set_simps)[1]
- 		 apply (rule set_eqI; clarsimp)
- 		 apply (rule iffI; clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
-  apply (rule conjI)
- 		  apply ( clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
- 		  apply (erule disjE, clarsimp)
-  apply clarsimp+
- 		  apply (erule disjE)+
-  apply clarsimp+
- 		  apply (erule disjE)+
-  apply clarsimp+
- 		  apply (erule disjE)+
-  apply clarsimp+
- 		  apply (erule disjE)+
-  apply clarsimp+
- 		  apply (erule disjE)+
-  apply clarsimp+
- 		  apply (erule disjE)+
-  apply clarsimp+
-  apply (rule  conjI; clarsimp?)
- 	oops
- 			 apply(auto simp add: as_set_simps )[1]
- 			apply(thin_tac "(_ \<and>* _) _")
-  		apply(subst (asm) subset_eq)
-  		apply(simp add: Ball_def)
-  		apply(clarsimp simp add: memory_range_elms_set_simps)
-  			apply(drule_tac x=x in spec, simp)
-  		apply(drule memory_elm_in_memory_range_elms)
-  			apply(clarsimp)
-  		apply(simp add: stateelm_means_simps stateelm_equiv_simps)
-
-(*   apply ( simp add: triple_inst_sem_def program_sem.simps as_set_simps)
-  apply( clarify)
-  apply( sep_simp simp: evm_sep; simp)
-  apply( simp split: instruction_result.splits)
-  apply( simp add: stateelm_means_simps stateelm_equiv_simps)
-  apply( simp add: vctx_next_instruction_def )
-              apply( clarsimp simp add: instruction_simps Let_def)
-  apply (rule conjI; clarsimp split:if_split_asm)
-  apply( (sep_simp simp: evm_sep)+)
-                 apply( simp add: stateelm_means_simps stateelm_equiv_simps)
-  apply (rule conjI)
-  apply( erule_tac P="(_ \<and>* _)" in back_subst)
-              apply(inst_sound_set_eq, set_solve)
- *)
   sorry
+
 lemma word_exp_eq_pow_mod :
 "word_exp a n = (a ^ n) mod (( 2 :: int) ^( 256 :: nat))"
   apply(induct n arbitrary: a rule: less_induct)
@@ -1680,6 +1568,10 @@ lemma memory_range_elms_same_addr:
   apply fastforce
   done
 
+lemma program_counter_first:
+  "(a \<and>* program_counter p \<and>* b) = (program_counter p \<and>* a \<and>* b)"
+  by (rule ac_simps)
+
 lemma pc_after_inst:
 notes
   if_split[split del]
@@ -1855,7 +1747,44 @@ apply(after_arith_if)
              apply (simp add: word_exp_eq_pow_mod)
              apply (simp add: word_exp_eq_pow_mod)
     				apply (uniq_state_elm_quasi)
-    				apply(case_tac "ha=Suc h"; simp)
+    				 apply(case_tac "ha=Suc h"; simp)
+        (* SHA3 *)
+  apply (simp (no_asm) add: program_counter_first)
+            apply(find_q_pc_after_inst)
+          apply(rule_tac x="(s - {PcElm n} -
+             {StackHeightElm (Suc (Suc h))} - {StackElm (h, len)} - {StackElm (Suc h, memaddr)}  - {MemoryUsageElm memu} - {GasElm g})
+             \<union> {StackElm (h, keccak xs)} \<union> {StackHeightElm (Suc h)} \<union>
+             {GasElm (g-sha3_gas len memu memaddr)} \<union> {PcElm (n+1)} \<union>
+             {MemoryUsageElm (M memu memaddr len)}" in exI)
+
+(**)
+          apply(sep_simp simp: program_counter_sep memory_usage_sep gas_pred_sep stack_sep stack_height_sep pure_sep, (erule conjE)?)+
+          apply(clarsimp simp add: gas_value_simps)
+          apply(rule conjI)
+          apply(erule_tac P="_ \<and>* _" in back_subst)
+      		 apply(rule  Set.equalityI)
+           apply(simp add: Set.subset_iff, clarify)
+          apply(rule conjI)
+            apply(rule notI; drule only_one_pc; simp)
+            			 apply(rule conjI, rule notI,simp add: uniq_stateelm_def)
+            		 apply(rule conjI, rule notI; simp add: uniq_stateelm_def)
+           apply(auto simp add: uniq_stateelm_def)[1]
+             apply(auto simp add: uniq_stateelm_def)[1]
+  apply -
+            apply(clarsimp simp add: uniq_stateelm_def )
+  apply (rule conjI, fastforce)
+  apply (rule conjI, fastforce)
+  apply (rule conjI, fastforce)
+  apply (rule conjI, clarsimp)
+  apply (rule conjI, fastforce)
+  apply clarsimp
+  apply (rule conjI, clarsimp)
+  apply (rule conjI, clarsimp)
+  apply (case_tac "ha = Suc h" ; clarsimp)
+  apply clarsimp
+  apply clarsimp
+  apply (rule conjI, fastforce)
+  apply (fastforce)
     (**BITS**)
     			apply(erule triple_inst_bits.cases; clarsimp)
     (*NOT*)

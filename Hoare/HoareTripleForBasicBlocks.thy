@@ -85,6 +85,9 @@ fun arith_3_1:: "arith_inst \<Rightarrow> w256 \<Rightarrow> w256 \<Rightarrow> 
 			else (\<lambda> i .  word_of_int ( i)) ((Word.uint a * Word.uint b) mod (Word.uint divisor))))"
 | "arith_3_1 _ = (\<lambda> a b c . 0)"
 
+abbreviation
+ "sha3_gas len memu memaddr \<equiv> (Gsha3 + Gsha3word * ((uint len + 31) div 32) - Cmem memu + Cmem (M memu memaddr len))"
+
 inductive triple_inst_arith :: "network \<Rightarrow> pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
   inst_arith_mul :
     "triple_inst_arith net
@@ -206,7 +209,7 @@ inductive triple_inst_arith :: "network \<Rightarrow> pred \<Rightarrow> pos_ins
        stack_height (Suc h) \<and>* stack h (word_of_int ((uint v ^ unat w) mod (2 ^  256))) \<and>*
        gas_pred (g - (Gexp + (if w = 0 then 0 else Gexpbyte net * (1 + log256floor (uint w:: int))))) \<and>* rest)"
   | inst_arith_sha3:
-    "triple_inst_arith net (\<langle> h \<le> 1022 \<and> unat len = length xs \<rangle> \<and>*
+    "triple_inst_arith net (\<langle> h \<le> 1022 \<and> unat len = length xs \<and>  0 \<le> memu \<and> sha3_gas len memu memaddr \<le> g\<rangle> \<and>*
        continuing \<and>* program_counter k \<and>*   
        stack_height (h+2) \<and>*
        stack (h+1) memaddr \<and>*
@@ -220,8 +223,8 @@ inductive triple_inst_arith :: "network \<Rightarrow> pred \<Rightarrow> pos_ins
      stack_height (h + 1) \<and>*
      stack h (keccak xs) \<and>*
      memory_range memaddr xs \<and>*
-     memory_usage (M memu memaddr 64) \<and>*
-     gas_pred (g - Gsha3 - Gsha3word * ((uint len) div 32) + Cmem memu - Cmem (M memu memaddr 64)) \<and>*
+     memory_usage (M memu memaddr len) \<and>*
+     gas_pred (g - sha3_gas len memu memaddr) \<and>*
      rest)"
 
 fun bits_2_1_verylow:: "bits_inst \<Rightarrow> w256 \<Rightarrow> w256 \<Rightarrow> w256" where
