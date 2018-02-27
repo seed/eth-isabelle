@@ -547,19 +547,32 @@ lemma dispatcher_hash_extract:
   apply (simp add: ucast_frm_32_le_mask_32)
   done
 
+lemma word_rsplit_byte_split:
+"(word_rsplit (w1::w256) :: byte list) =
+       a # aa # ab # ac # ad # ae # af # ag # ah # ai # aj #
+ ak # al # am # an # ao # ap # aq # ar # as # a't # au # av #
+ aw # ax # ay # az # ba # bb # bc # bd # be # lisue  \<Longrightarrow> lisue = []"
+  using length_word_rsplit_32[where x=w1]
+  by simp
+
+lemma memory_range_0_w256_append:
+  "(memory_range 0 (word_rsplit (w1::w256)) \<and>* memory_range 0x20  (word_rsplit (w2::w256))) =
+     memory_range 0 (word_rsplit w1 @ word_rsplit w2)"
+  apply (rule ext)
+  apply (case_tac "(word_rsplit w1 :: byte list)")
+   apply (simp add: length_0_conv[symmetric])
+  apply (rename_tac list , case_tac list, solves \<open>simp add: list_eq_iff_zip_eq[where xs="word_rsplit _"]\<close>)+
+  apply (simp add:)
+  apply (drule word_rsplit_byte_split)
+  apply simp
+  apply (thin_tac " _ = _ ")+
+  apply (rename_tac list)
+  apply (simp add: memory_range.simps)  
+  done
+
 lemma two_memory_memory_range_eq:
- "(memory 0 w1 \<and>* memory 0x20 w2 \<and>* R) = (memory_range 0 (word_rsplit w1 @ word_rsplit w2) \<and>* R)"
-proof -
-  have  "(R \<and>* memory 0 w1 \<and>* memory 0x20 w2) = (R \<and>* memory_range 0 (word_rsplit w1 @ word_rsplit w2))"
-   apply(rule ext)
-  apply (rule iffI)
-    apply (sep_cancel)
-     apply (clarsimp simp add: memory_def sep_conj_def)
-    find_theorems memory_range "op @"
-    sorry
-  thus ?thesis
-  by (simp add: ac_simps)
-qed
+ "(R' \<and>* memory 0x20 w2 \<and>* R  \<and>* memory 0 w1  \<and>* R'') = (memory_range 0 (word_rsplit w1 @ word_rsplit w2) \<and>* R' \<and>* R  \<and>* R'')"
+  by (simp add: memory_def, simp add: ac_simps, sep_simp simp: memory_range_0_w256_append)
 
 method fast_sep_imp_solve uses simp = 
   (match conclusion  in "triple_blocks _ _ _ _ _"  \<Rightarrow> \<open>succeed\<close> | 
@@ -581,11 +594,11 @@ and net: "at_least_eip150 net"
 shows
 "\<exists>r. triple net
   (\<langle>balances_mapping anyaddr \<noteq> balances_mapping sender \<and>
-    balances_mapping anyaddr \<noteq> balances_mapping to \<rangle> **
+    balances_mapping anyaddr \<noteq> balances_mapping to \<and> at_least_eip150 net \<rangle> **
    program_counter 0 ** stack_height 0 **
    sent_data (bytestr transfer_hash @ bytestr (w256 to) @ bytestr val) **
    sent_value 0 ** caller sender ** blk_num bn **
-   memory_usage 0 ** continuing ** gas_pred 40000 **
+   memory_usage 0 ** continuing ** gas_pred 100000 **
    storage (balances_mapping sender) balance_frm **
    storage (balances_mapping to) balance_to **
    storage (balances_mapping anyaddr) balance_any **
@@ -695,24 +708,172 @@ shows
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (simp, rule conjI)
-                    apply (clarsimp?, order_sep_conj)
-  apply sep_cancel
-  apply sep_cancel
-                    apply sep_cancel
-  apply sep_cancel
-  apply sep_cancel
-  apply sep_cancel
-  apply sep_cancel
-  (* use two_memory_memory_range_eq *)
-                    apply (sep_select_asm 2)
-  apply assumption
-  apply_trace (sep_cancel )
-  apply sep_cancel
+                    apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply ( subst (asm) two_memory_memory_range_eq)
+                   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                   apply (sep_imp_solve2 simp: balances_mapping_def bytestr_def w256_def word_rcat_simps)
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+   apply (block_vcg2)
+  apply -
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+  apply ( subst (asm) two_memory_memory_range_eq[symmetric])
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                      apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+  apply ( subst (asm) two_memory_memory_range_eq)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+                 apply (sep_imp_solve2 simp: )
+           apply (sep_imp_solve2 simp: )
+  apply (simp add: word_rcat_simps)
+   apply (block_vcg2)
+  apply -
+   apply (block_vcg2)
+  apply -
+   apply (block_vcg2)
+  apply -
+  apply simp
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply ( subst (asm) two_memory_memory_range_eq[symmetric])
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
 
-  apply ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
-)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply ( subst (asm) two_memory_memory_range_eq)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply  (clarsimp?, order_sep_conj, ((((sep_cancel, (clarsimp split:if_split)?)+)|simp add:|rule conjI)+)[1])
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply ( subst (asm) two_memory_memory_range_eq[symmetric])
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                     apply (sep_select_asm 3)
+                     apply (sep_select_asm 11)
+  apply (subst (asm) two_memory_memory_range_eq[where R'=emp and R=emp, simplified ])
+                     apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp:  word_rcat_rsplit)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+   apply (block_vcg2)
+  apply -
+   apply (block_vcg2)
+  apply -
+   apply (block_vcg2)
+  apply -
+  apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: word_rcat_simps log256floor.simps split: if_split)
+                      apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: word_rcat_simps log256floor.simps split: if_split)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply ( subst (asm) two_memory_memory_range_eq[symmetric])
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (subst (asm) two_memory_memory_range_eq[where R'=emp, simplified ])
+                     apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                     apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+                  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: word_rcat_simps log256floor.simps split: if_split)
+                     apply -
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: word_rcat_simps log256floor.simps split: if_split)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  oops
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+
+  apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+   
 (* SHA3 *)
   oops
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
