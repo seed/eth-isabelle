@@ -289,6 +289,16 @@ lemma sep_logged:
    (LogElm (n, l) \<in> s \<and> a (s - {LogElm (n, l)}))"
   by (solve_sep_iff simp: logged_def)
 
+lemma logged_sep:
+  "(logged n l ** a) s =
+   (LogElm (n, l) \<in> s \<and> a (s - {LogElm (n, l)}))"
+  by (solve_sep_iff simp: logged_def)
+
+lemma log_number_sep:
+  "(log_number n ** R) s =
+   (LogNumElm n \<in> s \<and> R (s - {LogNumElm n}))"
+  by (solve_sep_iff simp: log_number_def)
+
 definition gas_pred :: "int \<Rightarrow> state_element set \<Rightarrow> bool"
   where
     "gas_pred g s == s = {GasElm g}"

@@ -918,7 +918,53 @@ lemma word_exp_eq_pow_mod :
   apply simp
   done
 
+lemmas memory_range_elms_cut_memory_contexts =
+  memory_range_elms_cut_memory[rule_format, OF _ memory_range_elms_in_c[THEN iffD1]]
 
+lemma memory_range_elms_logs:
+  "x \<in> memory_range_elms in_begin input \<Longrightarrow>
+      (x \<in> variable_ctx_as_set (x1\<lparr>vctx_logs := p\<rparr>)) = (x \<in> variable_ctx_as_set x1)"
+by (auto simp add: as_set_simps dest: memory_range_elms_all)
+
+lemma inst_log_sound:
+ "triple_inst_log p (n, Log i) q \<Longrightarrow> triple_inst_sem net p (n, Log i) q"
+  apply(erule triple_inst_log.cases; clarsimp)
+  apply ( simp add: triple_inst_sem_def program_sem.simps as_set_simps,
+ clarify,
+ sep_simp simp: evm_sep; simp,
+ simp split: instruction_result.splits,
+ simp add: stateelm_means_simps stateelm_equiv_simps,
+ simp add: vctx_next_instruction_def,
+ clarsimp simp add: instruction_simps )
+  apply (simp add: Let_def)
+  apply (rule conjI[rotated])
+   apply (simp add: log_gas_def Glogdata_def Glogtopic_def Glog_def)
+  apply (clarsimp simp: not_memory_range_elms_all[simplified image_def])
+  apply (simp add: create_log_entry_def log_gas_def Glogdata_def Glogtopic_def Glog_def)
+  apply (subst (asm) memory_range_sep[rule_format, OF sym], assumption)
+  apply clarsimp
+  apply (rule conjI[rotated])
+   apply (simp add: vctx_returned_bytes_def)
+   apply (subst memory_range_elms_cut_memory_contexts[where c=co_ctx], assumption)
+
+    apply (erule subset_trans)
+    apply clarsimp
+   apply clarsimp
+   apply (drule subsetD, assumption)
+   apply clarsimp
+  apply (clarsimp simp: contexts_as_set_def)
+   apply (simp only: memory_range_simps)
+   apply (erule notE[where P="_ \<in> variable_ctx_as_set _ "])
+   apply (simp add: memory_range_elms_set_simps memory_range_elms_logs)
+  apply ( erule_tac P="(_ \<and>* _)" in back_subst)
+   apply (cut_tac in_begin=a and c=co_ctx and ?x1.0=x1 in memory_range_elms_cut_memory_contexts)
+    apply assumption
+    apply (erule subset_trans)
+    apply clarsimp
+  apply (thin_tac "_ \<subseteq> _")
+  apply set_solve
+     apply (simp add: vctx_returned_bytes_def)
+  done
 
 lemma triple_inst_soundness:
 notes
@@ -982,6 +1028,7 @@ shows
     apply(inst_sound_set_eq simp: cut_data_def, set_solve)
     	apply(rule inst_swap_sound)
   	 apply(rule inst_dup_sound)
+   apply(erule inst_log_sound)
   	apply(inst_sound_set_eq, set_solve)
  apply(simp add: inst_strengthen_pre_sem)
 apply(simp add: inst_false_pre_sem)

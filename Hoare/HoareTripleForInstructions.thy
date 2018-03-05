@@ -3263,6 +3263,8 @@ memory_range_sep
 code_sep
 sent_data_sep
 sent_value_sep
+logged_sep
+log_number_sep
 
 lemmas constant_diff_simps =
   constant_diff_gas

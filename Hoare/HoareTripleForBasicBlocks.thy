@@ -458,6 +458,33 @@ inductive triple_inst_info :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred \<
        stack_height (Suc h) \<and>* gas_pred (g - Gbase) \<and>*
        stack h (ucast c) \<and>* rest)"
 
+definition
+ log_gas :: "int \<Rightarrow> w256 \<Rightarrow> w256 \<Rightarrow> int \<Rightarrow> int" where
+ "log_gas n st sz m = Cmem (M (max 0 m) st sz) - Cmem (max 0 m) + (Glog + Glogdata * uint sz + n * Glogtopic)"
+
+inductive triple_inst_log :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
+ inst_log3:
+   "triple_inst_log
+      (\<langle> h \<le> 1019 \<and> length data = unat logged_size \<and> log_gas 3 logged_start logged_size m \<le> g\<rangle> \<and>*
+       memory_range logged_start data \<and>*
+       this_account this \<and>*
+       log_number n \<and>*
+       gas_pred g \<and>*
+       stack_topmost h [topic2, topic1, topic0, logged_size, logged_start] \<and>*
+       program_counter k \<and>*
+       memory_usage m \<and>*
+       continuing \<and>* rest)
+       (k, Log LOG3)
+      (memory_range logged_start data \<and>*
+       this_account this \<and>*
+       log_number (Suc n) \<and>*
+       logged n \<lparr> log_addr = this, log_topics = [topic0, topic1, topic2], log_data = data \<rparr> \<and>*
+       stack_topmost h [] \<and>*
+       gas_pred (g - log_gas 3 logged_start logged_size m) \<and>*
+       program_counter (k + 1) \<and>*
+       memory_usage (M m logged_start logged_size) \<and>*
+       continuing \<and>* rest)"
+
 inductive triple_inst :: "network \<Rightarrow> pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
   inst_arith :
     "triple_inst_arith net p (n, Arith i) q \<Longrightarrow> triple_inst net p (n, Arith i) q"
@@ -499,6 +526,8 @@ inductive triple_inst :: "network \<Rightarrow> pred \<Rightarrow> pos_inst \<Ri
          stack (h - unat n - 1) w \<and>*
          stack h w \<and>*
          continuing \<and>* rest)"
+| inst_log:
+  "triple_inst_log p (n, Log i) q \<Longrightarrow> triple_inst net p (n, Log i) q"
 | inst_unknown :
     "triple_inst net
 (\<langle> h \<le> 1024 \<and> 0 \<le> g\<rangle> \<and>*
