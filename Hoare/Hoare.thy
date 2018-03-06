@@ -611,6 +611,15 @@ lemma stackElmEquiv: "StackElm (pos, w) \<in> contexts_as_set v c =
   (pos < length (vctx_stack v) \<and> rev (vctx_stack v) ! pos = w)"
 by (auto simp add:context_rw)
 
+lemma logNumElmEquiv: "LogNumElm h \<in> contexts_as_set v c =
+  (length (vctx_logs v) = h)
+  "
+by (auto simp add:context_rw)
+
+lemma logElmEquiv: "LogElm (pos, w) \<in> contexts_as_set v c =
+  (pos < length (vctx_logs v) \<and> rev (vctx_logs v) ! pos = w)"
+by (auto simp add:context_rw)
+
 lemma pcElmEquiv : "PcElm k \<in> contexts_as_set va_ctx co_ctx =
   (vctx_pc va_ctx = k)"
 by (auto simp add:context_rw)
@@ -631,6 +640,8 @@ lemmas stateelm_equiv_simps =
   pcElmEquiv
   gasElmEquiv
   codeElmEquiv
+  logElmEquiv
+  logNumElmEquiv
 
 lemma insert_minus : "a \<noteq> b \<Longrightarrow> insert a s - { b } = insert a (s - {b})"
   apply(simp add: insert_Diff_if)
@@ -1060,6 +1071,8 @@ sep_memory_usage[simp]
 sep_memory_usage_sep[simp]
 stackHeightElmEquiv[simp]
 stackElmEquiv[simp]
+logElmEquiv[simp]
+logNumElmEquiv[simp]
 pcElmEquiv[simp]
 gasElmEquiv[simp]
 codeElmEquiv[simp]

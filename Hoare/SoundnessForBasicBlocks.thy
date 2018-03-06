@@ -839,9 +839,7 @@ lemma inst_suicide_sem:
   apply(subst ucast_ucast_mask)
   apply(simp add: mask_def)
  done
-(* FIXME: fix gas consumption post and preconditions, perhaps use abbreviation?
-  Check yellow paper.
-*)
+
 lemma inst_arith_sha3_sem:
   "triple_inst_sem net
         (\<langle> h \<le> 1022 \<and> unat len = length xs \<and> memu \<ge> 0 \<and> g \<ge> sha3_gas len memu memaddr\<rangle> \<and>*
@@ -1308,7 +1306,7 @@ done
 definition
  uniq_stateelm :: "state_element set \<Rightarrow> bool"
 where
- "uniq_stateelm s ==
+ "uniq_stateelm s \<equiv>
 (\<forall>v. PcElm v \<in> s \<longrightarrow> (\<forall>x. PcElm x \<in> s \<longrightarrow> x = v)) \<and>
 (\<forall>v. GasElm v \<in> s \<longrightarrow> (\<forall>x. GasElm x \<in> s \<longrightarrow> x = v)) \<and>
 (\<forall>v. StackHeightElm v \<in> s \<longrightarrow> (\<forall>v'. StackHeightElm v' \<in> s \<longrightarrow> v' = v)) \<and>
@@ -1316,7 +1314,11 @@ where
 (\<forall>v. StackHeightElm v \<in> s \<longrightarrow> (\<forall>h u. h \<ge> v \<longrightarrow> StackElm (h,u) \<notin> s)) \<and>
 (\<forall>h v. MemoryElm (h, v) \<in> s \<longrightarrow> (\<forall>v'. MemoryElm (h, v') \<in> s \<longrightarrow> v' = v)) \<and>
 (\<forall>h v. StorageElm (h, v) \<in> s \<longrightarrow> (\<forall>v'. StorageElm (h, v') \<in> s \<longrightarrow> v' = v)) \<and>
-(\<forall>v. MemoryUsageElm v \<in> s \<longrightarrow> (\<forall>x. MemoryUsageElm x \<in> s \<longrightarrow> x = v))"
+(\<forall>v. MemoryUsageElm v \<in> s \<longrightarrow> (\<forall>x. MemoryUsageElm x \<in> s \<longrightarrow> x = v))\<and>
+(\<forall>v. LogNumElm v \<in> s \<longrightarrow> (\<forall>v'. LogNumElm v' \<in> s \<longrightarrow> v' = v)) \<and>
+(\<forall>h v. LogElm (h, v) \<in> s \<longrightarrow> (\<forall>v'. LogElm (h, v') \<in> s \<longrightarrow> v' = v)) \<and>
+(\<forall>v. LogNumElm v \<in> s \<longrightarrow> (\<forall>h u. h \<ge> v \<longrightarrow> LogElm (h,u) \<notin> s))
+"
 
 lemma uniq_gaselm:
 "s = instruction_result_as_set co_ctx presult \<Longrightarrow>
@@ -1367,7 +1369,37 @@ lemma stack_max_elm_plus[rule_format]:
 "instruction_result_as_set co_ctx presult = s + y \<Longrightarrow>
 (\<forall>v. StackHeightElm v \<in> s \<longrightarrow> (\<forall>h u. h \<ge> v \<longrightarrow> StackElm (h,u) \<notin> s))"
 	by (drule sym, drule stack_max_elm, simp add: plus_set_def)
-		
+
+lemma uniq_lognumelm:
+"x = instruction_result_as_set co_ctx presult \<Longrightarrow>
+(\<forall>v. LogNumElm v \<in> x \<longrightarrow> (\<forall>v'. LogNumElm v' \<in> x \<longrightarrow> v' = v))"
+by (simp add:instruction_result_as_set_def logNumElmEquiv split:instruction_result.splits)
+
+lemma uniq_lognumelm_plus[rule_format]:
+"instruction_result_as_set co_ctx presult = x + y \<Longrightarrow>
+(\<forall>v. LogNumElm v \<in> x \<longrightarrow> (\<forall>v'. LogNumElm v' \<in> x \<longrightarrow> v' = v))"
+by (drule sym, drule uniq_lognumelm, simp add: plus_set_def)
+
+lemma uniq_logelm:
+"x = instruction_result_as_set co_ctx presult \<Longrightarrow>
+(\<forall>h v. LogElm (h, v) \<in> x \<longrightarrow> (\<forall>v'. LogElm (h, v') \<in> x \<longrightarrow> v' = v))"
+by (simp add:instruction_result_as_set_def logElmEquiv split:instruction_result.splits)
+
+lemma uniq_logelm_plus[rule_format]:
+"instruction_result_as_set co_ctx presult = x + y \<Longrightarrow>
+(\<forall>h v. LogElm (h, v) \<in> x \<longrightarrow> (\<forall>v'. LogElm (h, v') \<in> x \<longrightarrow> v' = v))"
+by (drule sym, drule uniq_logelm, simp add: plus_set_def)
+
+lemma log_max_elm:
+"s = instruction_result_as_set co_ctx presult \<Longrightarrow>
+(\<forall>v. LogNumElm v \<in> s \<longrightarrow> (\<forall>h u. h \<ge> v \<longrightarrow> LogElm (h,u) \<notin> s))"
+by(simp add:instruction_result_as_set_def logElmEquiv logNumElmEquiv split:instruction_result.splits)
+
+lemma log_max_elm_plus[rule_format]:
+"instruction_result_as_set co_ctx presult = s + y \<Longrightarrow>
+(\<forall>v. LogNumElm v \<in> s \<longrightarrow> (\<forall>h u. h \<ge> v \<longrightarrow> LogElm (h,u) \<notin> s))"
+	by (drule sym, drule log_max_elm, simp add: plus_set_def)
+
 lemma uniq_memuelm:
 "x = instruction_result_as_set co_ctx presult \<Longrightarrow>
 (\<forall>v. MemoryUsageElm v \<in> x \<longrightarrow> (\<forall>v'. MemoryUsageElm v' \<in> x \<longrightarrow> v' = v))"
@@ -1402,7 +1434,8 @@ lemmas uniq_stateelm_simps=
 uniq_stateelm_def
 uniq_gaselm_plus uniq_pcelm_plus uniq_stackheightelm_plus
 stack_max_elm_plus uniq_stackelm_plus uniq_memuelm_plus
-uniq_memelm_plus uniq_storageelm_plus
+uniq_memelm_plus uniq_storageelm_plus uniq_logelm_plus
+uniq_lognumelm_plus log_max_elm_plus
 
 lemma inst_res_as_set_uniq_stateelm:
 "(pre \<and>* code (blocks_insts blocks) \<and>* resta)
@@ -2095,7 +2128,46 @@ apply(rule_tac x="(s - {PcElm n} - {GasElm g} -
    apply (simp add: uniq_stateelm_def)
    apply(rule conjI, fastforce)+
    	 apply(fastforce)
-   	  apply(drule meta_mp)
+  	    apply(erule triple_inst_log.cases; clarsimp)
+      	apply((rule exI; rule conjI),
+rule ext,
+rule iffI)
+      apply ((clarsimp simp add: program_counter_first)?, assumption)
+     apply (sep_simp simp: program_counter_sep)
+apply(rule_tac x="(s - {PcElm n} - {GasElm g} -
+             {StackHeightElm (Suc (Suc (Suc (Suc (Suc h)))))} - {StackElm (h, topic2)} - 
+             {StackElm (Suc h, topic1)} - {StackElm (Suc (Suc h), topic0)} - 
+              {StackElm (Suc (Suc (Suc h)), logged_size)} - {StackElm (Suc (Suc (Suc (Suc h))),logged_start)} -
+              {MemoryUsageElm m} - {LogNumElm na}) \<union> 
+              {StackHeightElm (h)} \<union>
+             {GasElm (g- log_gas 3 logged_start logged_size m)} \<union> {PcElm (n+1)}
+              \<union> {LogNumElm (Suc na)} \<union> {LogElm (na, \<lparr>log_addr = this, log_topics = [topic0, topic1, topic2], log_data = data\<rparr>)}
+              \<union> {MemoryUsageElm (M m logged_start logged_size)} " in exI)
+  apply simp
+          apply(sep_simp simp: program_counter_sep gas_pred_sep stack_sep stack_height_sep pure_sep this_account_sep log_number_sep logged_sep memory_usage_sep stack_topmost_sep continuing_sep , ((erule conjE)+)?)+
+     apply (clarsimp simp: set_diff_eq)
+  apply(rule conjI)
+  apply(erule_tac P="_ \<and>* _" in back_subst)
+   		 apply(rule  Set.equalityI)
+           apply(simp add: Set.subset_iff, clarify)
+        apply(rule conjI)
+            apply(rule notI; drule only_one_pc; simp)
+            		  apply(auto simp add: uniq_stateelm_def)[2]
+       apply(simp add: uniq_stateelm_def)
+       apply(rule conjI, fastforce)
+       apply(rule conjI, fastforce)
+    apply(rule conjI, fastforce)
+    apply (rule conjI, clarsimp)+
+  apply (rename_tac ln u)
+  apply (case_tac "ln = h"; clarsimp)
+  apply (case_tac "ln = Suc h"; clarsimp)
+  apply (case_tac "ln = Suc (Suc h)"; clarsimp)
+  apply (case_tac "ln = Suc (Suc (Suc h))"; clarsimp)
+  apply (case_tac "ln = Suc (Suc (Suc (Suc h)))"; clarsimp)
+  apply clarsimp
+    apply(rule conjI, fastforce)+
+  apply fastforce
+  apply(drule meta_mp)
   apply(rule_tac x=s in exI; rule conjI; simp)
   apply(assumption)
   apply(simp add: pure_def)
@@ -2739,6 +2811,8 @@ PcElm n \<in> s"
       apply(erule triple_inst_pc.cases; clarsimp; sep_simp simp: pure_sep sep_fun_simps; simp)
      apply(erule triple_inst_stack.cases; clarsimp; sep_simp simp: pure_sep sep_fun_simps; simp)
     apply(sep_simp simp: pure_sep sep_fun_simps; simp)+
+   apply(erule triple_inst_log.cases; clarsimp; sep_simp simp: pure_sep sep_fun_simps; simp)
+  apply(sep_simp simp: pure_sep sep_fun_simps; simp)+
  apply(simp add: pure_def)
 done
 
