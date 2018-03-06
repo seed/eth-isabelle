@@ -574,6 +574,55 @@ lemma two_memory_memory_range_eq:
  "(R' \<and>* memory 0x20 w2 \<and>* R  \<and>* memory 0 w1  \<and>* R'') = (memory_range 0 (word_rsplit w1 @ word_rsplit w2) \<and>* R' \<and>* R  \<and>* R'')"
   by (simp add: memory_def, simp add: ac_simps, sep_simp simp: memory_range_0_w256_append)
 
+lemma  stack_topmost_unfold_sep:
+  "(stack_topmost h [a, b, c, d, e] ** R)
+  = (stack_height (Suc (Suc (Suc (Suc (Suc h))))) ** stack h a ** stack (Suc h) b  ** stack (Suc (Suc h)) c** stack (Suc (Suc (Suc h))) d  
+  ** stack (Suc (Suc (Suc (Suc h)))) e ** R)"
+  apply (unfold stack_topmost_def)
+  apply clarsimp
+  apply (rule ext)
+  apply (rule iffI)
+  apply (clarsimp simp add: sep_basic_simps stack_def stack_height_def )
+  apply (rule_tac x="insert (StackElm (Suc (Suc (Suc (Suc h))), e))
+                 (insert (StackElm (Suc (Suc (Suc h)), d))
+                   (insert (StackElm (Suc (Suc h), c))
+                     (insert (StackElm (Suc h, b)) (insert (StackElm (h, a)) y))))" in exI)
+  apply clarsimp
+  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e), StackElm (Suc (Suc (Suc h)), d),
+                      StackElm (Suc (Suc h), c), StackElm (Suc h, b)} \<union> y" in exI)
+   apply clarsimp
+   apply (rule conjI)
+    apply blast
+  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e), StackElm (Suc (Suc (Suc h)), d),
+                      StackElm (Suc (Suc h), c)} \<union> y" in exI)
+   apply clarsimp
+   apply (rule conjI)
+    apply blast
+  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e), StackElm (Suc (Suc (Suc h)), d) } \<union> y" in exI)
+   apply clarsimp
+  
+   apply (rule conjI)
+    apply blast
+  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e) } \<union> y" in exI)
+ 
+   apply clarsimp
+   apply blast  
+  apply (clarsimp simp add: sep_basic_simps stack_def stack_height_def )
+  apply (drule_tac x=ye in spec)
+  apply blast
+  done
+
+lemma sep_stack_topmost_unfold_sep:
+  "(R' ** stack_topmost h [a, b, c, d, e] ** R)
+  = (R' ** stack_height (Suc (Suc (Suc (Suc (Suc h))))) ** stack h a ** stack (Suc h) b  ** stack (Suc (Suc h)) c** stack (Suc (Suc (Suc h))) d  
+  ** stack (Suc (Suc (Suc (Suc h)))) e ** R)"
+  by (sep_simp simp: stack_topmost_unfold_sep)
+
+lemma memory_range_last:
+ "unat (len::w256) = length data \<Longrightarrow> 
+  (a \<and>* memory_range st data \<and>* b) = (a \<and>* b \<and>*  memory_range st data)"
+ by (sep_simp simp: memory_range_sep)+
+
 method fast_sep_imp_solve uses simp = 
   (match conclusion  in "triple_blocks _ _ _ _ _"  \<Rightarrow> \<open>succeed\<close> | 
     ( sep_imp_solve2 simp:simp, fast_sep_imp_solve simp: simp) )
@@ -607,12 +656,18 @@ shows
    memory (0::w256) m0x0 **
    memory (0x20::w256) m0x20 **
    memory (0x40::w256) (bytestr_to_w256 [x]) **
-   memory (0x60::w256) (bytestr_to_w256 [y]))
+   memory (0x60::w256) (bytestr_to_w256 [y]) **
+   log_number log_num **
+   this_account this)
   blocks_basictoken
   (let c = success_cond to val balance_frm balance_to in
    storage (balances_mapping sender) (if c then balance_frm - val else balance_frm) **
    storage (balances_mapping to) (if c then balance_to + val else balance_to) ** 
-   storage (balances_mapping anyaddr) balance_any ** r)"
+   storage (balances_mapping anyaddr) balance_any **
+   (if c then logged log_num \<lparr>log_addr = sender, log_topics = topics, log_data = data\<rparr> **
+               log_number (Suc log_num)
+    else emp) **
+     r)"
   apply (insert blk_num[simplified word_less_nat_alt] net)
   apply (simp add: Let_def)
   apply (clarsimp simp: success_cond_def split: if_splits; safe)
@@ -865,329 +920,32 @@ shows
                  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
                  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
                  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-                      apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  oops
-                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-
-  apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
-   
-(* SHA3 *)
-  oops
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (fast_sep_imp_solve simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-  apply (clarsimp simp add: word_rcat_simps log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-                      apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (sep_imp_solve2 simp: log256floor.simps)
-  apply (clarsimp simp add: word_rcat_simps )
-  apply (sep_imp_solve2 simp:)
-  apply (sep_imp_solve2 simp:)
-  apply -
-  apply -
-  oops
-        apply (simp add: bytestr_def min_def word_rcat_simps)
-  using bit_mask_rev
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply ( solves \<open> match conclusion in "block_lookup _ _ = Some _"  \<Rightarrow> \<open>simp add:word_rcat_simps\<close>, (rule conjI, (rule refl)+)\<close>)+
-         apply (sep_imp_solve2)
-
-  apply (clarsimp, sep_imp_solve2)
-          apply (clarsimp, sep_imp_solve2)
-  apply (solves \<open>simp add:word_rcat_simps\<close>)+
-  apply (solves \<open>simp add:word_rcat_simps\<close> )+
-
-  apply (clarsimp, sep_imp_solve2)
-  apply (clarsimp, sep_imp_solve2)
-  apply (clarsimp, sep_imp_solve2)
-  apply (clarsimp, sep_imp_solve2)
-  apply (clarsimp, sep_imp_solve2)
-  apply (simp, sep_imp_solve2)
-  apply (simp, sep_imp_solve2)
-  apply (simp, sep_imp_solve2)
-  apply (simp, sep_imp_solve2)
-  apply (simp, sep_imp_solve2)
-  apply (simp, sep_imp_solve2)
-  apply (simp, sep_imp_solve2)
-  apply (simp, sep_imp_solve2)
-  apply (simp, sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-
-  oops
-
-  split_conds,
-  ((blocks_rule_vcg; (rule refl)?), triple_seq_vcg),
-  (sep_imp_solve2)+,
-  (solves \<open>split_conds\<close>)?
-
-  apply ((block_vcg2)[1])
-  apply -
-
-  oops
-      apply (clarsimp  simp: word_rcat_simps)
+                     apply -
+  apply (simp add: sep_stack_topmost_unfold_sep )
+  apply (subst memory_range_last)
+                    apply  (clarsimp?, order_sep_conj)
+                      apply (subst  stack_first[where h="(Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc 0)))))))))" and a="log_number log_num"])
   apply simp
-       apply ((block_vcg2)[1])
-  apply -
-   apply ((block_vcg2)[1])
-  apply -
-   apply ((block_vcg2)[1])
-  apply -
-   apply ((block_vcg2)[1])
-  apply -
-   apply ((block_vcg2)[1])
-  apply -
-   apply ((block_vcg2)[1])
-  apply -
-   apply ((block_vcg2)[1])
-  apply -
-   apply ((block_vcg2)[1])
-  apply -
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (split_conds)
-(* 1*)
-  apply (clarsimp)+
-  apply(split if_split, rule conjI)+
-  apply(safe; clarsimp)
-  apply( clarsimp)
-  apply(rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (clarsimp split: if_split_asm simp: word_rcat_simps)
-  apply (clarsimp)+
-  apply(split if_split, rule conjI)+
-  apply(safe; clarsimp)
-  apply( clarsimp)
-  apply(rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (clarsimp)
-   apply (rule conjI)
-   apply (clarsimp simp: word_rcat_simps)
- (* write simp rules to put stack in first pos *)
-  apply (sep_select 6)
-   apply (sep_cancel)+
-   apply (clarsimp split: if_split simp: word_rcat_simps)
-   apply (split_conds)
-   apply (sep_cancel)+
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (split_conds)
-(*1*)
-  apply (clarsimp split: if_split )
-  apply (rule conjI; clarsimp)
-  apply (case_tac " hash = pay_hash"; clarsimp)
-  apply (case_tac "v \<noteq> 0")
-   apply (rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (split_conds)
-  apply (case_tac "amount \<noteq> 0"; clarsimp)
-  apply(rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (split_conds)
-  apply(rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (split_conds)
-(*1*)
-  apply (case_tac " hash = refund_hash"; clarsimp)
-  apply (case_tac "v \<noteq> 0")
-   apply (rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (split_conds)
-  apply (case_tac "amount \<noteq> 0"; clarsimp)
-  apply(rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (split_conds)
-  apply(rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (split_conds)
-(*1*)
-  apply (case_tac "hash = addfund_hash"; clarsimp)
-  apply (case_tac "amount > 0")
-  apply (case_tac "amount \<noteq> v")
-  apply (case_tac "sender \<noteq> buyer")
-  apply (rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-  apply ((block_vcg2)[1])
-   apply (split_conds)
-  apply (rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (split_conds)
-  apply (rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (split_conds)
-  apply (rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply (split_conds)
-  apply (rule exI)
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-   apply ((block_vcg2)[1])
-  done
+  apply (simp add: stack_first)
+  find_theorems memory_range "(_ ** _) = _"
+  apply (rule conjI)
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+  
+  apply ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  oops
+
 end

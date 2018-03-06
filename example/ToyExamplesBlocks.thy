@@ -85,6 +85,7 @@ inst_strengthen_pre[OF inst_bits[OF inst_bits_or]]
 inst_strengthen_pre[OF inst_bits[OF inst_bits_xor]]
 inst_strengthen_pre[OF inst_bits[OF inst_bits_byte]]
 inst_strengthen_pre[OF inst_unknown]
+inst_strengthen_pre[OF inst_log[OF inst_log3]]
 
 
 lemma instantiate_emp:
