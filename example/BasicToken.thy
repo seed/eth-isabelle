@@ -664,7 +664,10 @@ shows
    storage (balances_mapping sender) (if c then balance_frm - val else balance_frm) **
    storage (balances_mapping to) (if c then balance_to + val else balance_to) ** 
    storage (balances_mapping anyaddr) balance_any **
-   (if c then logged log_num \<lparr>log_addr = sender, log_topics = topics, log_data = data\<rparr> **
+   (if c then logged log_num \<lparr>log_addr = this,
+                              log_topics = [0xDDF252AD1BE2C89B69C2B068FC378DAA952BA7F163C4A11628F55A4DF523B3EF,
+                                   UCAST(160 \<rightarrow> 256) sender, UCAST(160 \<rightarrow> 256) to],
+                              log_data = word_rsplit val\<rparr> **
                log_number (Suc log_num)
     else emp) **
      r)"
@@ -922,8 +925,244 @@ shows
                  apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
                      apply -
-  apply (simp add: sep_stack_topmost_unfold_sep )
-  apply (subst memory_range_last)
+                     apply (subst memory_range_last[where data="word_rsplit val" and len=32] )
+  apply (simp )
+  
+                      apply (simp add: sep_stack_topmost_unfold_sep )
+  apply (subst  sep_conj_ac(1)[where Q="memory_range _ _"])
+                    apply  (clarsimp?, order_sep_conj)
+  apply (rule conjI)
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+                      apply sep_cancel
+
+                      apply sep_cancel
+                      apply sep_cancel
+  apply sep_cancel
+  apply (simp add: memory_def)
+                      apply sep_cancel
+  apply (clarsimp simp: log_gas_def split: if_split)
+                    apply (unfold stack_topmost_def, simp only: stack_topmost_elms.simps )[1]
+  apply (unfold stack_height_def)[1]
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: log_gas_def split: if_split)
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: log_gas_def split: if_split)
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: log_gas_def split: if_split)
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: log_gas_def split: if_split)
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: log_gas_def split: if_split)
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: log_gas_def split: if_split)
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: log_gas_def split: if_split)
+             apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply ( split_conds)
+  apply (
+  ((blocks_rule_vcg; (rule refl)?), triple_seq_vcg))
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (unfold memory_def)[1]
+  apply (subgoal_tac "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0x60::byte] = word_rsplit (0x60::w256)")
+  apply (erule_tac P="\<lambda>x. (\<langle> _ \<le> 1023 \<and>
+            Gverylow - Cmem _ + Cmem (M _ _ 0x20) \<le> _ \<and>
+            0 \<le> _ \<and> length (word_rsplit _) = unat 0x20 \<rangle> \<and>*
+          stack _ _ \<and>*
+          stack_height (_ + 1) \<and>*
+          program_counter 196 \<and>*
+          memory_usage _ \<and>*
+          memory_range _ (x) \<and>* gas_pred _ \<and>* continuing \<and>* _)
+          s" in subst)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply -
+  apply (simp (no_asm) add: word_rsplit_def bin_rsplit_def)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+  apply (simp (no_asm) add: memory_def)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+             apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+            apply (clarsimp simp : balances_mapping_def bytestr_def w256_def word_rcat_simps log_gas_def)
+  apply (subst add.commute[where b=val])
+  apply simp
+             apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (split_conds)
+            apply (split_conds)
+            apply unat_arith
+           apply simp
+  apply (simp add: word_rcat_rsplit)
+            apply (split_conds)
+            apply (split_conds)
+          apply (split_conds)
+          apply unat_arith
+    apply (simp add:  len_bytestr_simps)
+        apply (subst (asm) dispatcher_hash_extract)
+         apply (simp add: len_bytestr_simps)
+  apply split_conds
+  apply split_conds
+  apply (simp add: bytestr_def w256_def word_rcat_rsplit)
+        apply simp
+    apply (simp add:  len_bytestr_simps)
+        apply (subst (asm) dispatcher_hash_extract)
+         apply (simp add: len_bytestr_simps)
+       apply (split_conds)
+  apply (simp add: bytestr_def w256_def word_rcat_rsplit)
+       apply (erule notE[where P="_ = (0xA9059CBB::w256)"])
+       apply (simp add: word_rcat_simps)
+(* First failure case *)
+        apply (simp add:blocks_basictoken_simp)
+      apply(simp add: blocks_simps triple_def )
+
+      
+      apply (rule exI)
+   apply (block_vcg2)
+       apply -
+  apply (split if_split_asm; clarsimp)
+   apply (block_vcg2)
+  apply -
+  apply (simp add: bytestr_def; simp add: word_rcat_simps)
+     apply (split_conds)
+
+      apply (  ((blocks_rule_vcg; (rule refl)?), triple_seq_vcg))
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+          apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+        apply (sep_imp_solve2)
+  apply (simp split: if_split_asm)
+
+      (* Continue HEre hopefully *)
+  apply (solves \<open>simp add: word_rcat_simps\<close>)
+         apply (solves \<open>simp add: word_rcat_simps\<close>)
+
+    apply (simp add:  len_bytestr_simps)
+        apply (subst (asm) dispatcher_hash_extract)
+         apply (simp add: len_bytestr_simps)
+
+         apply (simp add: word_rcat_simps)
+  apply (simp add:  len_bytestr_simps)
+        apply (subst (asm) dispatcher_hash_extract)
+         apply (simp add: len_bytestr_simps)
+        apply (solves \<open>simp add: bytestr_def ;simp add: word_rcat_simps\<close>)
+  apply (simp add: word_rcat_simps len_bytestr_simps)
+      apply (simp add: word_rcat_simps len_bytestr_simps)
+      apply (subst (asm) dispatcher_hash_extract)
+  apply (simp add: len_bytestr_simps)
+
+   apply (block_vcg2)
+  apply -
+  apply (simp add: word_rcat_simps len_bytestr_simps)
+      apply (subst (asm) dispatcher_hash_extract)
+        apply (simp add: len_bytestr_simps)
+        apply (solves \<open>simp add: bytestr_def ;simp add: word_rcat_simps\<close>)
+
+        apply (subst (asm) dispatcher_hash_extract)
+        apply (simp add: len_bytestr_simps)
+        apply (simp)
+   apply (block_vcg2)
+  apply -
+
+  oops
+  find_theorems word_rcat "Cons"
+          apply (
+  ((blocks_rule_vcg; (rule refl)?), triple_seq_vcg))
+  apply -
+                      apply (sep_imp_solve2 simp:   word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def  word_rcat_simps)
+
+  
+  find_theorems "word_rsplit "
+  
+                                          apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  using 
+
+  oops
+                                          apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  oops
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+
+                                          apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: log_gas_def split: if_split)
+
+                      apply (sep_imp_solve2 simp: log_gas_def word_rcat_simps)
+
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+                 apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  
+  oops
+  apply
+  (sep_imp_solve2 simp:simp)+,
+  (solves \<open>split_conds\<close>)?)
+  apply -
+  oops
+                    apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+  apply (clarsimp simp: log_gas_def split: if_split)
+
+  oops
+                    
+
+                    
+                    apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+
+  
+  oops
+  apply  (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+
                     apply  (clarsimp?, order_sep_conj)
                       apply (subst  stack_first[where h="(Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc 0)))))))))" and a="log_number log_num"])
   apply simp
