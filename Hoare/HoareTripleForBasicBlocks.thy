@@ -610,6 +610,20 @@ inductive triple_blocks :: "network \<Rightarrow> basic_blocks \<Rightarrow> pre
 definition triple :: "network \<Rightarrow> pred \<Rightarrow> basic_blocks \<Rightarrow> pred \<Rightarrow> bool" where
 "triple net pre blocks post = triple_blocks net blocks pre (hd blocks) post"
 
+lemma blocks_next_ex:
+  "\<lbrakk>triple_seq net pre insts (program_counter i \<and>* q);
+    i = n + inst_size_list insts;
+    block_lookup blocks i = Some (bi, ti);
+    \<exists>r''. triple_blocks net blocks (program_counter i \<and>* q) (i, bi, ti) (post \<and>* r'')\<rbrakk> \<Longrightarrow>
+   \<exists>r. triple_blocks net blocks pre (n, insts, Next) (post \<and>* r)"
+  apply clarsimp
+  apply (drule  blocks_next)
+     apply (rule refl)
+    apply assumption
+   apply assumption
+  apply (erule exI)
+  done
+
 lemma blocks_jumpi_uint:
 "\<lbrakk>  triple_seq net pre insts
       ((\<langle> h \<le> 1022  \<and> Ghigh \<le> g \<and> m \<ge> 0\<rangle> \<and>*
@@ -633,6 +647,25 @@ apply(assumption)+
 apply(simp)
 done
 
+lemma blocks_jumpi_uint_ex:
+"\<lbrakk>  triple_seq net pre insts
+      ((\<langle> h \<le> 1022  \<and> Ghigh \<le> g \<and> m \<ge> 0\<rangle> \<and>*
+       stack_height (Suc (Suc h)) \<and>*
+       stack (Suc h) dest \<and>*
+       stack h cond \<and>* gas_pred g \<and>*
+       continuing \<and>* memory_usage m \<and>*
+       program_counter (n + inst_size_list insts) \<and>* rest));
+    j = n + 1 + inst_size_list insts;
+    block_lookup blocks (uint dest) = Some (bi, ti);
+    bi = (uint dest, Pc JUMPDEST) # bbi;
+    block_lookup blocks j = Some (bj, tj);
+    r = (stack_height h \<and>* gas_pred (g - Ghigh) \<and>*
+         continuing \<and>* memory_usage m \<and>* rest);
+    (cond \<noteq> 0 \<Longrightarrow> \<exists>r'. triple_blocks net blocks (r \<and>* program_counter (uint dest)) (uint dest, bi, ti) (post \<and>* r'));
+    (cond = 0 \<Longrightarrow> \<exists>r'. triple_blocks net blocks (r \<and>* program_counter j) (j, bj, tj) (post \<and>* r'))\<rbrakk> \<Longrightarrow>
+   \<exists>r. triple_blocks net blocks pre (n, insts, Jumpi) (post \<and>* r)"
+  by (case_tac "cond = 0"; fastforce dest:blocks_jumpi_uint)
+
 lemma blocks_jump_uint :
   "\<lbrakk>triple_seq net pre insts
       (\<langle> h \<le> 1023 \<and> Gmid \<le> g \<and> m \<ge> 0\<rangle> \<and>*
@@ -648,7 +681,38 @@ lemma blocks_jump_uint :
        continuing \<and>* rest)
       (uint dest, bi, ti) post\<rbrakk> \<Longrightarrow>
    triple_blocks net blocks pre (n, insts, Jump) post"
-by(rule blocks_jump; simp)
+  by(rule blocks_jump; simp)
+
+lemma blocks_jump_uint_ex :
+  "\<lbrakk>triple_seq net pre insts
+      (\<langle> h \<le> 1023 \<and> Gmid \<le> g \<and> m \<ge> 0\<rangle> \<and>*
+       program_counter (n + inst_size_list insts) \<and>* gas_pred g \<and>*
+       memory_usage m \<and>* stack_height (Suc h) \<and>*
+       stack h dest \<and>*
+       continuing \<and>* rest);
+    block_lookup blocks (uint dest) = Some (bi, ti);
+    bi = (uint dest, Pc JUMPDEST) # bbi;
+    \<exists>r'. triple_blocks net blocks
+      (program_counter (uint dest) \<and>* gas_pred (g - Gmid) \<and>*
+       memory_usage m \<and>* stack_height h \<and>*
+       continuing \<and>* rest)
+      (uint dest, bi, ti) (post \<and>* r')\<rbrakk> \<Longrightarrow>
+   \<exists>r. triple_blocks net blocks pre (n, insts, Jump) (post \<and>* r)"
+  apply clarsimp
+  apply (drule (1) blocks_jump_uint)
+    apply (rule refl)
+   apply assumption
+  apply (erule exI)
+  done
+
+
+lemma  blocks_no_ex :
+  "triple_seq net pre insts (post \<and>* r') \<Longrightarrow>
+   \<exists>r. triple_blocks net blocks pre (n, insts, Terminal) (post \<and>* r)"
+  apply (drule blocks_no)
+  apply (rule exI[where x=r'])
+  apply (simp)
+  done
 
 lemma inst_return_memory :
     "triple_inst_misc net
