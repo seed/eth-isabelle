@@ -1102,7 +1102,49 @@ shows
     apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
-(* Continue from Here *)
+    apply (simp  only: memory_def diff_Suc_1 unat_1)
+    apply (sep_imp_solve2)
+  apply (case_tac "success_cond to val balance_frm balance_to" ; clarsimp)
+   apply (clarsimp simp: balances_mapping_def bytestr_def w256_def word_rcat_simps add.commute[where b=val])
+   apply (sep_imp_solve2)
+  apply (thin_tac "(_ \<and>* _) _")
+  apply (erule notE[where P="success_cond _ _ _ _"])
+  apply (clarsimp simp: success_cond_def word_rcat_rsplit w256_def)
+  apply ((rule conjI)+; unat_arith)
+  apply (simp add: word_rsplit_def bin_rsplit_def)
+  apply split_conds
+  apply split_conds
+  apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+  apply (case_tac "success_cond to val balance_frm balance_to" ; clarsimp)
+   apply (clarsimp simp: word_rcat_rsplit w256_def word_rcat_simps success_cond_def)
+  apply unat_arith
+
+(* UP TO HERE *)
+
+  apply (erule notE[where P="val + balance_to < _"])
+  apply (clarsimp simp: success_cond_def word_rcat_rsplit w256_def)
+  apply ((rule conjI), unat_arith)+
+oops
+  apply (simp add: word_rsplit_def bin_rsplit_def)
+   apply (clarsimp simp: word_rcat_rsplit w256_def word_rcat_simps success_cond_def)
+  apply unat_arith
+   apply (clarsimp simp: balances_mapping_def bytestr_def w256_def word_rcat_simps add.commute[where b=val])
+   apply (sep_imp_solve2)
+  
+   apply (sep_imp_solve2)
+  apply (thin_tac "(_ \<and>* _) _")
+  apply (erule notE[where P="success_cond _ _ _ _"])
+  apply (clarsimp simp: success_cond_def word_rcat_rsplit w256_def)
+  apply ((rule conjI)+; unat_arith)
+     apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+   oops
+
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
