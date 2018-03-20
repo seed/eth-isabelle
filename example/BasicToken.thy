@@ -363,6 +363,10 @@ definition
  where
  "balances_mapping addr \<equiv>  keccak (bytestr (w256 addr) @ bytestr (0::w256))"
 
+(* Omit the last overflow check on balance_to as
+   this contract implementation does not have as an explicit requirement
+   but handles it via SafeMath exceptions.
+
 definition success_cond
   where
  "success_cond to val balance_frm balance_to \<equiv>
@@ -370,6 +374,14 @@ definition success_cond
   val \<le> balance_frm \<and>
   balance_frm - val \<le> balance_frm \<and>
   balance_to + val \<ge> balance_to"
+*)
+definition success_cond
+  where
+ "success_cond to val balance_frm balance_to \<equiv>
+  to \<noteq> 0 \<and>
+  val \<le> balance_frm \<and>
+  balance_frm - val \<le> balance_frm"
+
 
 lemma len_bytestr_simps: 
  "\<And>x. length (bytestr (x::32 word)) = 4"
@@ -669,9 +681,9 @@ shows
   blocks_basictoken
   ((let c = success_cond to val balance_frm balance_to in
    storage (balances_mapping sender) (if c then balance_frm - val else balance_frm) **
-   storage (balances_mapping to) (if c then balance_to + val else balance_to) ** 
+   storage (balances_mapping to) (if c \<and> balance_to + val \<ge> balance_to then balance_to + val else balance_to) ** 
    storage (balances_mapping anyaddr) balance_any **
-   (if c then logged log_num \<lparr>log_addr = this,
+   (if c \<and> balance_to + val \<ge> balance_to then logged log_num \<lparr>log_addr = this,
                               log_topics = [0xDDF252AD1BE2C89B69C2B068FC378DAA952BA7F163C4A11628F55A4DF523B3EF,
                                    UCAST(160 \<rightarrow> 256) sender, UCAST(160 \<rightarrow> 256) to],
                               log_data = word_rsplit val\<rparr> **
@@ -1103,22 +1115,28 @@ shows
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (simp  only: memory_def diff_Suc_1 unat_1)
-    apply (sep_imp_solve2)
+         apply (sep_imp_solve2)
+  apply(case_tac "balance_to \<le> balance_to + val", clarsimp)
   apply (case_tac "success_cond to val balance_frm balance_to" ; clarsimp)
    apply (clarsimp simp: balances_mapping_def bytestr_def w256_def word_rcat_simps add.commute[where b=val])
    apply (sep_imp_solve2)
   apply (thin_tac "(_ \<and>* _) _")
   apply (erule notE[where P="success_cond _ _ _ _"])
   apply (clarsimp simp: success_cond_def word_rcat_rsplit w256_def)
-  apply ((rule conjI)+; unat_arith)
+         apply ((rule conjI)+; unat_arith)
+        apply(unat_arith)
   apply (simp add: word_rsplit_def bin_rsplit_def)
   apply split_conds
   apply split_conds
   apply (triple_blocks_vcg)
     apply (sep_imp_solve2)
   apply (case_tac "success_cond to val balance_frm balance_to" ; clarsimp)
-   apply (clarsimp simp: word_rcat_rsplit w256_def word_rcat_simps success_cond_def)
-  apply unat_arith
+       apply (clarsimp simp: word_rcat_rsplit w256_def word_rcat_simps success_cond_def balances_mapping_def bytestr_def)
+       apply(case_tac "balance_to \<le> balance_to + val", unat_arith)
+       apply simp
+       apply (sep_imp_solve2)
+
+
 
 (* UP TO HERE *)
 
