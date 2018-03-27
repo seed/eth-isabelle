@@ -1,4 +1,4 @@
-theory BasicToken
+theory OptimisedBasicToken
 
 imports
   Dispatcher
@@ -37,7 +37,10 @@ contract BasicToken is ERC20Basic {
   */
   function transfer(address _to, uint256 _value) public returns (bool) {
     require(_to != address(0));
-    require(_value <= balances[msg.sender]);
+    /* The following require is redundant with safe math
+        assertion in SafeMath.sub.
+    */
+    // require(_value <= balances[msg.sender]);
 
     // SafeMath.sub will throw if there is not enough balance.
     balances[msg.sender] = balances[msg.sender].sub(_value);
@@ -58,15 +61,15 @@ contract BasicToken is ERC20Basic {
 }
 
 Compiled with:
- /usr/bin/solc --optimize --overwrite -o basic --bin-runtime --asm --hashes
-  --allow-paths /home/samani/dev/ethereum/seed/zeppelin-solidity/contracts/math/ BasicToken.sol
+ /usr/bin/solc --optimize --overwrite -o optimised-basic --bin-runtime --asm --hashes
+  --allow-paths /home/samani/dev/ethereum/seed/zeppelin-solidity/contracts/math/ OptimisedBasicToken.sol
 
 70a08231: balanceOf(address)
 18160ddd: totalSupply()
 a9059cbb: transfer(address,uint256)
 
 *)
-value"(parse_bytecode ''6060604052600436106100565763ffffffff7c010000000000000000000000000000000000000000000000000000000060003504166318160ddd811461005b57806370a0823114610080578063a9059cbb1461009f575b600080fd5b341561006657600080fd5b61006e6100d5565b60405190815260200160405180910390f35b341561008b57600080fd5b61006e600160a060020a03600435166100db565b34156100aa57600080fd5b6100c1600160a060020a03600435166024356100f6565b604051901515815260200160405180910390f35b60015490565b600160a060020a031660009081526020819052604090205490565b6000600160a060020a038316151561010d57600080fd5b600160a060020a03331660009081526020819052604090205482111561013257600080fd5b600160a060020a03331660009081526020819052604090205461015b908363ffffffff61020816565b600160a060020a033381166000908152602081905260408082209390935590851681522054610190908363ffffffff61021a16565b60008085600160a060020a0316600160a060020a031681526020019081526020016000208190555082600160a060020a031633600160a060020a03167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef8460405190815260200160405180910390a350600192915050565b60008282111561021457fe5b50900390565b60008282018381101561022957fe5b93925050505600a165627a7a723058205d06b4dc1682b339c944c79aa2261422213d898c8f9bd1f82ffc19214b9784280029'')"
+value"(parse_bytecode ''6060604052600436106100565763ffffffff7c010000000000000000000000000000000000000000000000000000000060003504166318160ddd811461005b57806370a0823114610080578063a9059cbb1461009f575b600080fd5b341561006657600080fd5b61006e6100d5565b60405190815260200160405180910390f35b341561008b57600080fd5b61006e600160a060020a03600435166100db565b34156100aa57600080fd5b6100c1600160a060020a03600435166024356100f6565b604051901515815260200160405180910390f35b60015490565b600160a060020a031660009081526020819052604090205490565b6000600160a060020a038316151561010d57600080fd5b600160a060020a033316600090815260208190526040902054610136908363ffffffff6101e316565b600160a060020a03338116600090815260208190526040808220939093559085168152205461016b908363ffffffff6101f516565b60008085600160a060020a0316600160a060020a031681526020019081526020016000208190555082600160a060020a031633600160a060020a03167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef8460405190815260200160405180910390a350600192915050565b6000828211156101ef57fe5b50900390565b60008282018381101561020457fe5b93925050505600a165627a7a7230582052802772002d60968839f12e0b905a2b3142271f958da1c18fe8ffb91dd6c7350029'')"
 
 definition insts_ex where
 "insts_ex == [Stack (PUSH_N [0x60]), Stack (PUSH_N [0x40]), Memory MSTORE, Stack (PUSH_N [4]), Info CALLDATASIZE,
@@ -97,44 +100,41 @@ definition insts_ex where
   Arith ISZERO, Arith ISZERO, Stack (PUSH_N [1, 0xD]), Pc JUMPI, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD,
   Pc JUMPDEST, Stack (PUSH_N [1]), Stack (PUSH_N [0xA0]), Stack (PUSH_N [2]), Arith EXP, Arith SUB,
   Info CALLER, Bits inst_AND, Stack (PUSH_N [0]), Swap 0, Dup 1, Memory MSTORE, Stack (PUSH_N [0x20]), Dup 1,
-  Swap 0, Memory MSTORE, Stack (PUSH_N [0x40]), Swap 0, Arith SHA3, Storage SLOAD, Dup 2, Arith inst_GT,
-  Arith ISZERO, Stack (PUSH_N [1, 0x32]), Pc JUMPI, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST,
-  Stack (PUSH_N [1]), Stack (PUSH_N [0xA0]), Stack (PUSH_N [2]), Arith EXP, Arith SUB, Info CALLER,
-  Bits inst_AND, Stack (PUSH_N [0]), Swap 0, Dup 1, Memory MSTORE, Stack (PUSH_N [0x20]), Dup 1, Swap 0,
-  Memory MSTORE, Stack (PUSH_N [0x40]), Swap 0, Arith SHA3, Storage SLOAD, Stack (PUSH_N [1, 0x5B]), Swap 0,
-  Dup 3, Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF]), Stack (PUSH_N [2, 8]), Bits inst_AND, Pc JUMP, Pc JUMPDEST,
-  Stack (PUSH_N [1]), Stack (PUSH_N [0xA0]), Stack (PUSH_N [2]), Arith EXP, Arith SUB, Info CALLER, Dup 1,
-  Bits inst_AND, Stack (PUSH_N [0]), Swap 0, Dup 1, Memory MSTORE, Stack (PUSH_N [0x20]), Dup 1, Swap 0,
-  Memory MSTORE, Stack (PUSH_N [0x40]), Dup 0, Dup 2, Arith SHA3, Swap 3, Swap 0, Swap 3, Storage SSTORE,
-  Swap 0, Dup 5, Bits inst_AND, Dup 1, Memory MSTORE, Arith SHA3, Storage SLOAD, Stack (PUSH_N [1, 0x90]),
-  Swap 0, Dup 3, Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF]), Stack (PUSH_N [2, 0x1A]), Bits inst_AND, Pc JUMP,
-  Pc JUMPDEST, Stack (PUSH_N [0]), Dup 0, Dup 5, Stack (PUSH_N [1]), Stack (PUSH_N [0xA0]),
-  Stack (PUSH_N [2]), Arith EXP, Arith SUB, Bits inst_AND, Stack (PUSH_N [1]), Stack (PUSH_N [0xA0]),
-  Stack (PUSH_N [2]), Arith EXP, Arith SUB, Bits inst_AND, Dup 1, Memory MSTORE, Stack (PUSH_N [0x20]),
-  Arith ADD, Swap 0, Dup 1, Memory MSTORE, Stack (PUSH_N [0x20]), Arith ADD, Stack (PUSH_N [0]), Arith SHA3,
-  Dup 1, Swap 0, Storage SSTORE, Stack POP, Dup 2, Stack (PUSH_N [1]), Stack (PUSH_N [0xA0]),
-  Stack (PUSH_N [2]), Arith EXP, Arith SUB, Bits inst_AND, Info CALLER, Stack (PUSH_N [1]),
-  Stack (PUSH_N [0xA0]), Stack (PUSH_N [2]), Arith EXP, Arith SUB, Bits inst_AND,
+  Swap 0, Memory MSTORE, Stack (PUSH_N [0x40]), Swap 0, Arith SHA3, Storage SLOAD, Stack (PUSH_N [1, 0x36]),
+  Swap 0, Dup 3, Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF]), Stack (PUSH_N [1, 0xE3]), Bits inst_AND, Pc JUMP,
+  Pc JUMPDEST, Stack (PUSH_N [1]), Stack (PUSH_N [0xA0]), Stack (PUSH_N [2]), Arith EXP, Arith SUB,
+  Info CALLER, Dup 1, Bits inst_AND, Stack (PUSH_N [0]), Swap 0, Dup 1, Memory MSTORE, Stack (PUSH_N [0x20]),
+  Dup 1, Swap 0, Memory MSTORE, Stack (PUSH_N [0x40]), Dup 0, Dup 2, Arith SHA3, Swap 3, Swap 0, Swap 3,
+  Storage SSTORE, Swap 0, Dup 5, Bits inst_AND, Dup 1, Memory MSTORE, Arith SHA3, Storage SLOAD,
+  Stack (PUSH_N [1, 0x6B]), Swap 0, Dup 3, Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF]), Stack (PUSH_N [1, 0xF5]),
+  Bits inst_AND, Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0]), Dup 0, Dup 5, Stack (PUSH_N [1]),
+  Stack (PUSH_N [0xA0]), Stack (PUSH_N [2]), Arith EXP, Arith SUB, Bits inst_AND, Stack (PUSH_N [1]),
+  Stack (PUSH_N [0xA0]), Stack (PUSH_N [2]), Arith EXP, Arith SUB, Bits inst_AND, Dup 1, Memory MSTORE,
+  Stack (PUSH_N [0x20]), Arith ADD, Swap 0, Dup 1, Memory MSTORE, Stack (PUSH_N [0x20]), Arith ADD,
+  Stack (PUSH_N [0]), Arith SHA3, Dup 1, Swap 0, Storage SSTORE, Stack POP, Dup 2, Stack (PUSH_N [1]),
+  Stack (PUSH_N [0xA0]), Stack (PUSH_N [2]), Arith EXP, Arith SUB, Bits inst_AND, Info CALLER,
+  Stack (PUSH_N [1]), Stack (PUSH_N [0xA0]), Stack (PUSH_N [2]), Arith EXP, Arith SUB, Bits inst_AND,
   Stack (PUSH_N
           [0xDD, 0xF2, 0x52, 0xAD, 0x1B, 0xE2, 0xC8, 0x9B, 0x69, 0xC2, 0xB0, 0x68, 0xFC, 0x37, 0x8D, 0xAA,
            0x95, 0x2B, 0xA7, 0xF1, 0x63, 0xC4, 0xA1, 0x16, 0x28, 0xF5, 0x5A, 0x4D, 0xF5, 0x23, 0xB3, 0xEF]),
   Dup 4, Stack (PUSH_N [0x40]), Memory MLOAD, Swap 0, Dup 1, Memory MSTORE, Stack (PUSH_N [0x20]), Arith ADD,
   Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Swap 1, Arith SUB, Swap 0, Log LOG3, Stack POP,
   Stack (PUSH_N [1]), Swap 2, Swap 1, Stack POP, Stack POP, Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0]), Dup 2,
-  Dup 2, Arith inst_GT, Arith ISZERO, Stack (PUSH_N [2, 0x14]), Pc JUMPI, Unknown 0xFE, Pc JUMPDEST,
+  Dup 2, Arith inst_GT, Arith ISZERO, Stack (PUSH_N [1, 0xEF]), Pc JUMPI, Unknown 0xFE, Pc JUMPDEST,
   Stack POP, Swap 0, Arith SUB, Swap 0, Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0]), Dup 2, Dup 2, Arith ADD,
-  Dup 3, Dup 1, Arith inst_LT, Arith ISZERO, Stack (PUSH_N [2, 0x29]), Pc JUMPI, Unknown 0xFE, Pc JUMPDEST,
+  Dup 3, Dup 1, Arith inst_LT, Arith ISZERO, Stack (PUSH_N [2, 4]), Pc JUMPI, Unknown 0xFE, Pc JUMPDEST,
   Swap 3, Swap 2, Stack POP, Stack POP, Stack POP, Pc JUMP, Misc STOP, Log LOG1,
-  Stack (PUSH_N [0x62, 0x7A, 0x7A, 0x72, 0x30, 0x58]), Arith SHA3, Unknown 0x5D, Arith MOD, Unknown 0xB4,
-  Unknown 0xDC, Bits inst_AND, Dup 2, Unknown 0xB3, Memory CODECOPY, Unknown 0xC9, Info DIFFICULTY,
-  Unknown 0xC7, Swap 0xA, Log LOG2, Unknown 0x26, Arith inst_EQ, Unknown 0x22, Unknown 0x21, Unknown 0x3D,
-  Dup 9, Dup 0xC, Dup 0xF, Swap 0xB, Unknown 0xD1, Unknown 0xF8, Unknown 0x2F, Unknown 0xFC, Bits inst_NOT,
-  Unknown 0x21, Unknown 0x4B, Swap 7, Dup 4, Unknown 0x28, Misc STOP, Unknown 0x29]"
+  Stack (PUSH_N [0x62, 0x7A, 0x7A, 0x72, 0x30, 0x58]), Arith SHA3, Memory MSTORE, Dup 0, Unknown 0x27,
+  Stack (PUSH_N
+          [0, 0x2D, 0x60, 0x96, 0x88, 0x39, 0xF1, 0x2E, 0xB, 0x90, 0x5A, 0x2B, 0x31, 0x42, 0x27, 0x1F, 0x95,
+           0x8D, 0xA1]),
+  Unknown 0xC1, Dup 0xF, Unknown 0xE8, Misc SUICIDE, Unknown 0xB9, Unknown 0x1D, Unknown 0xD6, Unknown 0xC7,
+  Stack CALLDATALOAD, Misc STOP, Unknown 0x29]"
 value "length insts_ex"
-(* 395 instructions *)
+(* 348 instructions *)
 
 lemma
- "parse_bytecode ''6060604052600436106100565763ffffffff7c010000000000000000000000000000000000000000000000000000000060003504166318160ddd811461005b57806370a0823114610080578063a9059cbb1461009f575b600080fd5b341561006657600080fd5b61006e6100d5565b60405190815260200160405180910390f35b341561008b57600080fd5b61006e600160a060020a03600435166100db565b34156100aa57600080fd5b6100c1600160a060020a03600435166024356100f6565b604051901515815260200160405180910390f35b60015490565b600160a060020a031660009081526020819052604090205490565b6000600160a060020a038316151561010d57600080fd5b600160a060020a03331660009081526020819052604090205482111561013257600080fd5b600160a060020a03331660009081526020819052604090205461015b908363ffffffff61020816565b600160a060020a033381166000908152602081905260408082209390935590851681522054610190908363ffffffff61021a16565b60008085600160a060020a0316600160a060020a031681526020019081526020016000208190555082600160a060020a031633600160a060020a03167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef8460405190815260200160405180910390a350600192915050565b60008282111561021457fe5b50900390565b60008282018381101561022957fe5b93925050505600a165627a7a723058205d06b4dc1682b339c944c79aa2261422213d898c8f9bd1f82ffc19214b9784280029'' = insts_ex"
+ "parse_bytecode ''6060604052600436106100565763ffffffff7c010000000000000000000000000000000000000000000000000000000060003504166318160ddd811461005b57806370a0823114610080578063a9059cbb1461009f575b600080fd5b341561006657600080fd5b61006e6100d5565b60405190815260200160405180910390f35b341561008b57600080fd5b61006e600160a060020a03600435166100db565b34156100aa57600080fd5b6100c1600160a060020a03600435166024356100f6565b604051901515815260200160405180910390f35b60015490565b600160a060020a031660009081526020819052604090205490565b6000600160a060020a038316151561010d57600080fd5b600160a060020a033316600090815260208190526040902054610136908363ffffffff6101e316565b600160a060020a03338116600090815260208190526040808220939093559085168152205461016b908363ffffffff6101f516565b60008085600160a060020a0316600160a060020a031681526020019081526020016000208190555082600160a060020a031633600160a060020a03167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef8460405190815260200160405180910390a350600192915050565b6000828211156101ef57fe5b50900390565b60008282018381101561020457fe5b93925050505600a165627a7a7230582052802772002d60968839f12e0b905a2b3142271f958da1c18fe8ffb91dd6c7350029'' = insts_ex"
   unfolding insts_ex_def
   by eval
 
@@ -206,80 +206,69 @@ lemma blocks_basictoken_simp:
          (274, Stack (PUSH_N [2])), (276, Arith EXP), (277, Arith SUB), (278, Info CALLER),
          (279, Bits inst_AND), (280, Stack (PUSH_N [0])), (282, Swap 0), (283, Dup 1), (284, Memory MSTORE),
          (285, Stack (PUSH_N [0x20])), (287, Dup 1), (288, Swap 0), (289, Memory MSTORE),
-         (290, Stack (PUSH_N [0x40])), (292, Swap 0), (293, Arith SHA3), (294, Storage SLOAD), (295, Dup 2),
-         (296, Arith inst_GT), (297, Arith ISZERO), (298, Stack (PUSH_N [1, 0x32]))],
-   Jumpi),
-  (302, [(302, Stack (PUSH_N [0])), (304, Dup 0), (305, Unknown 0xFD)], Terminal),
-  (306, [(306, Pc JUMPDEST), (307, Stack (PUSH_N [1])), (309, Stack (PUSH_N [0xA0])),
-         (311, Stack (PUSH_N [2])), (313, Arith EXP), (314, Arith SUB), (315, Info CALLER),
-         (316, Bits inst_AND), (317, Stack (PUSH_N [0])), (319, Swap 0), (320, Dup 1), (321, Memory MSTORE),
-         (322, Stack (PUSH_N [0x20])), (324, Dup 1), (325, Swap 0), (326, Memory MSTORE),
-         (327, Stack (PUSH_N [0x40])), (329, Swap 0), (330, Arith SHA3), (331, Storage SLOAD),
-         (332, Stack (PUSH_N [1, 0x5B])), (335, Swap 0), (336, Dup 3),
-         (337, Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF])), (342, Stack (PUSH_N [2, 8])), (345, Bits inst_AND)],
+         (290, Stack (PUSH_N [0x40])), (292, Swap 0), (293, Arith SHA3), (294, Storage SLOAD),
+         (295, Stack (PUSH_N [1, 0x36])), (298, Swap 0), (299, Dup 3),
+         (300, Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF])), (305, Stack (PUSH_N [1, 0xE3])),
+         (308, Bits inst_AND)],
    Jump),
-  (347, [(347, Pc JUMPDEST), (348, Stack (PUSH_N [1])), (350, Stack (PUSH_N [0xA0])),
-         (352, Stack (PUSH_N [2])), (354, Arith EXP), (355, Arith SUB), (356, Info CALLER), (357, Dup 1),
-         (358, Bits inst_AND), (359, Stack (PUSH_N [0])), (361, Swap 0), (362, Dup 1), (363, Memory MSTORE),
-         (364, Stack (PUSH_N [0x20])), (366, Dup 1), (367, Swap 0), (368, Memory MSTORE),
-         (369, Stack (PUSH_N [0x40])), (371, Dup 0), (372, Dup 2), (373, Arith SHA3), (374, Swap 3),
-         (375, Swap 0), (376, Swap 3), (377, Storage SSTORE), (378, Swap 0), (379, Dup 5),
-         (380, Bits inst_AND), (381, Dup 1), (382, Memory MSTORE), (383, Arith SHA3), (384, Storage SLOAD),
-         (385, Stack (PUSH_N [1, 0x90])), (388, Swap 0), (389, Dup 3),
-         (390, Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF])), (395, Stack (PUSH_N [2, 0x1A])),
-         (398, Bits inst_AND)],
+  (310, [(310, Pc JUMPDEST), (311, Stack (PUSH_N [1])), (313, Stack (PUSH_N [0xA0])),
+         (315, Stack (PUSH_N [2])), (317, Arith EXP), (318, Arith SUB), (319, Info CALLER), (320, Dup 1),
+         (321, Bits inst_AND), (322, Stack (PUSH_N [0])), (324, Swap 0), (325, Dup 1), (326, Memory MSTORE),
+         (327, Stack (PUSH_N [0x20])), (329, Dup 1), (330, Swap 0), (331, Memory MSTORE),
+         (332, Stack (PUSH_N [0x40])), (334, Dup 0), (335, Dup 2), (336, Arith SHA3), (337, Swap 3),
+         (338, Swap 0), (339, Swap 3), (340, Storage SSTORE), (341, Swap 0), (342, Dup 5),
+         (343, Bits inst_AND), (344, Dup 1), (345, Memory MSTORE), (346, Arith SHA3), (347, Storage SLOAD),
+         (348, Stack (PUSH_N [1, 0x6B])), (351, Swap 0), (352, Dup 3),
+         (353, Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF])), (358, Stack (PUSH_N [1, 0xF5])),
+         (361, Bits inst_AND)],
    Jump),
-  (400, [(400, Pc JUMPDEST), (401, Stack (PUSH_N [0])), (403, Dup 0), (404, Dup 5),
-         (405, Stack (PUSH_N [1])), (407, Stack (PUSH_N [0xA0])), (409, Stack (PUSH_N [2])),
-         (411, Arith EXP), (412, Arith SUB), (413, Bits inst_AND), (414, Stack (PUSH_N [1])),
-         (416, Stack (PUSH_N [0xA0])), (418, Stack (PUSH_N [2])), (420, Arith EXP), (421, Arith SUB),
-         (422, Bits inst_AND), (423, Dup 1), (424, Memory MSTORE), (425, Stack (PUSH_N [0x20])),
-         (427, Arith ADD), (428, Swap 0), (429, Dup 1), (430, Memory MSTORE), (431, Stack (PUSH_N [0x20])),
-         (433, Arith ADD), (434, Stack (PUSH_N [0])), (436, Arith SHA3), (437, Dup 1), (438, Swap 0),
-         (439, Storage SSTORE), (440, Stack POP), (441, Dup 2), (442, Stack (PUSH_N [1])),
-         (444, Stack (PUSH_N [0xA0])), (446, Stack (PUSH_N [2])), (448, Arith EXP), (449, Arith SUB),
-         (450, Bits inst_AND), (451, Info CALLER), (452, Stack (PUSH_N [1])), (454, Stack (PUSH_N [0xA0])),
-         (456, Stack (PUSH_N [2])), (458, Arith EXP), (459, Arith SUB), (460, Bits inst_AND),
-         (461, Stack (PUSH_N
+  (363, [(363, Pc JUMPDEST), (364, Stack (PUSH_N [0])), (366, Dup 0), (367, Dup 5),
+         (368, Stack (PUSH_N [1])), (370, Stack (PUSH_N [0xA0])), (372, Stack (PUSH_N [2])),
+         (374, Arith EXP), (375, Arith SUB), (376, Bits inst_AND), (377, Stack (PUSH_N [1])),
+         (379, Stack (PUSH_N [0xA0])), (381, Stack (PUSH_N [2])), (383, Arith EXP), (384, Arith SUB),
+         (385, Bits inst_AND), (386, Dup 1), (387, Memory MSTORE), (388, Stack (PUSH_N [0x20])),
+         (390, Arith ADD), (391, Swap 0), (392, Dup 1), (393, Memory MSTORE), (394, Stack (PUSH_N [0x20])),
+         (396, Arith ADD), (397, Stack (PUSH_N [0])), (399, Arith SHA3), (400, Dup 1), (401, Swap 0),
+         (402, Storage SSTORE), (403, Stack POP), (404, Dup 2), (405, Stack (PUSH_N [1])),
+         (407, Stack (PUSH_N [0xA0])), (409, Stack (PUSH_N [2])), (411, Arith EXP), (412, Arith SUB),
+         (413, Bits inst_AND), (414, Info CALLER), (415, Stack (PUSH_N [1])), (417, Stack (PUSH_N [0xA0])),
+         (419, Stack (PUSH_N [2])), (421, Arith EXP), (422, Arith SUB), (423, Bits inst_AND),
+         (424, Stack (PUSH_N
                        [0xDD, 0xF2, 0x52, 0xAD, 0x1B, 0xE2, 0xC8, 0x9B, 0x69, 0xC2, 0xB0, 0x68, 0xFC, 0x37,
                         0x8D, 0xAA, 0x95, 0x2B, 0xA7, 0xF1, 0x63, 0xC4, 0xA1, 0x16, 0x28, 0xF5, 0x5A, 0x4D,
                         0xF5, 0x23, 0xB3, 0xEF])),
-         (494, Dup 4), (495, Stack (PUSH_N [0x40])), (497, Memory MLOAD), (498, Swap 0), (499, Dup 1),
-         (500, Memory MSTORE), (501, Stack (PUSH_N [0x20])), (503, Arith ADD), (504, Stack (PUSH_N [0x40])),
-         (506, Memory MLOAD), (507, Dup 0), (508, Swap 1), (509, Arith SUB), (510, Swap 0), (511, Log LOG3),
-         (512, Stack POP), (513, Stack (PUSH_N [1])), (515, Swap 2), (516, Swap 1), (517, Stack POP),
-         (518, Stack POP)],
+         (457, Dup 4), (458, Stack (PUSH_N [0x40])), (460, Memory MLOAD), (461, Swap 0), (462, Dup 1),
+         (463, Memory MSTORE), (464, Stack (PUSH_N [0x20])), (466, Arith ADD), (467, Stack (PUSH_N [0x40])),
+         (469, Memory MLOAD), (470, Dup 0), (471, Swap 1), (472, Arith SUB), (473, Swap 0), (474, Log LOG3),
+         (475, Stack POP), (476, Stack (PUSH_N [1])), (478, Swap 2), (479, Swap 1), (480, Stack POP),
+         (481, Stack POP)],
    Jump),
-  (520, [(520, Pc JUMPDEST), (521, Stack (PUSH_N [0])), (523, Dup 2), (524, Dup 2), (525, Arith inst_GT),
-         (526, Arith ISZERO), (527, Stack (PUSH_N [2, 0x14]))],
+  (483, [(483, Pc JUMPDEST), (484, Stack (PUSH_N [0])), (486, Dup 2), (487, Dup 2), (488, Arith inst_GT),
+         (489, Arith ISZERO), (490, Stack (PUSH_N [1, 0xEF]))],
    Jumpi),
-  (531, [(531, Unknown 0xFE)], Terminal),
-  (532, [(532, Pc JUMPDEST), (533, Stack POP), (534, Swap 0), (535, Arith SUB), (536, Swap 0)], Jump),
-  (538, [(538, Pc JUMPDEST), (539, Stack (PUSH_N [0])), (541, Dup 2), (542, Dup 2), (543, Arith ADD),
-         (544, Dup 3), (545, Dup 1), (546, Arith inst_LT), (547, Arith ISZERO),
-         (548, Stack (PUSH_N [2, 0x29]))],
+  (494, [(494, Unknown 0xFE)], Terminal),
+  (495, [(495, Pc JUMPDEST), (496, Stack POP), (497, Swap 0), (498, Arith SUB), (499, Swap 0)], Jump),
+  (501, [(501, Pc JUMPDEST), (502, Stack (PUSH_N [0])), (504, Dup 2), (505, Dup 2), (506, Arith ADD),
+         (507, Dup 3), (508, Dup 1), (509, Arith inst_LT), (510, Arith ISZERO),
+         (511, Stack (PUSH_N [2, 4]))],
    Jumpi),
-  (552, [(552, Unknown 0xFE)], Terminal),
-  (553, [(553, Pc JUMPDEST), (554, Swap 3), (555, Swap 2), (556, Stack POP), (557, Stack POP),
-         (558, Stack POP)],
+  (515, [(515, Unknown 0xFE)], Terminal),
+  (516, [(516, Pc JUMPDEST), (517, Swap 3), (518, Swap 2), (519, Stack POP), (520, Stack POP),
+         (521, Stack POP)],
    Jump),
-  (560, [(560, Misc STOP)], Terminal),
-  (561, [(561, Log LOG1), (562, Stack (PUSH_N [0x62, 0x7A, 0x7A, 0x72, 0x30, 0x58])), (569, Arith SHA3),
-         (570, Unknown 0x5D)],
+  (523, [(523, Misc STOP)], Terminal),
+  (524, [(524, Log LOG1), (525, Stack (PUSH_N [0x62, 0x7A, 0x7A, 0x72, 0x30, 0x58])), (532, Arith SHA3),
+         (533, Memory MSTORE), (534, Dup 0), (535, Unknown 0x27)],
    Terminal),
-  (571, [(571, Arith MOD), (572, Unknown 0xB4)], Terminal), (573, [(573, Unknown 0xDC)], Terminal),
-  (574, [(574, Bits inst_AND), (575, Dup 2), (576, Unknown 0xB3)], Terminal),
-  (577, [(577, Memory CODECOPY), (578, Unknown 0xC9)], Terminal),
-  (579, [(579, Info DIFFICULTY), (580, Unknown 0xC7)], Terminal),
-  (581, [(581, Swap 0xA), (582, Log LOG2), (583, Unknown 0x26)], Terminal),
-  (584, [(584, Arith inst_EQ), (585, Unknown 0x22)], Terminal), (586, [(586, Unknown 0x21)], Terminal),
-  (587, [(587, Unknown 0x3D)], Terminal),
-  (588, [(588, Dup 9), (589, Dup 0xC), (590, Dup 0xF), (591, Swap 0xB), (592, Unknown 0xD1)], Terminal),
-  (593, [(593, Unknown 0xF8)], Terminal), (594, [(594, Unknown 0x2F)], Terminal),
-  (595, [(595, Unknown 0xFC)], Terminal), (596, [(596, Bits inst_NOT), (597, Unknown 0x21)], Terminal),
-  (598, [(598, Unknown 0x4B)], Terminal),
-  (599, [(599, Swap 7), (600, Dup 4), (601, Unknown 0x28)], Terminal), (602, [(602, Misc STOP)], Terminal),
-  (603, [(603, Unknown 0x29)], Terminal)]"
+  (536, [(536, Stack (PUSH_N
+                       [0, 0x2D, 0x60, 0x96, 0x88, 0x39, 0xF1, 0x2E, 0xB, 0x90, 0x5A, 0x2B, 0x31, 0x42, 0x27,
+                        0x1F, 0x95, 0x8D, 0xA1])),
+         (556, Unknown 0xC1)],
+   Terminal),
+  (557, [(557, Dup 0xF), (558, Unknown 0xE8)], Terminal), (559, [(559, Misc SUICIDE)], Terminal),
+  (560, [(560, Unknown 0xB9)], Terminal), (561, [(561, Unknown 0x1D)], Terminal),
+  (562, [(562, Unknown 0xD6)], Terminal), (563, [(563, Unknown 0xC7)], Terminal),
+  (564, [(564, Stack CALLDATALOAD), (565, Misc STOP)], Terminal), (566, [(566, Unknown 0x29)], Terminal)]"
   by eval
 
 definition balanceOf_hash :: "32 word"  where
@@ -840,9 +829,6 @@ shows
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-  apply (split_conds)
-  apply (split_conds)
   apply (triple_blocks_vcg)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
@@ -851,30 +837,14 @@ shows
     apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
     apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
      apply (sep_imp_solve2)
+    apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
+  apply (rule refl)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-  apply ( subst (asm) two_memory_memory_range_eq[symmetric])
-   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-  apply ( subst (asm) two_memory_memory_range_eq)
-   apply (sep_imp_solve2 simp: log256floor.simps word_rcat_simps)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
+  apply (rule refl)
+  apply split_conds
+  apply split_conds
   apply (triple_blocks_vcg)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
@@ -884,20 +854,7 @@ shows
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-  apply (triple_blocks_vcg)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
+
   apply (triple_blocks_vcg)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
@@ -1131,8 +1088,6 @@ apply split_conds
    apply unat_arith
   apply (clarsimp simp: word_rcat_rsplit )
  apply (triple_blocks_vcg)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
     apply (sep_imp_solve2)
        apply (clarsimp simp: word_rcat_rsplit w256_def word_rcat_simps requires_cond_def balances_mapping_def bytestr_def)
     apply (sep_imp_solve2)
