@@ -170,10 +170,10 @@ inst \<notin> {Misc STOP, Misc RETURN, Misc SUICIDE} \<union> range Unknown \<un
 
 lemma inst_sem_gas_consume:
   "instruction_sem var const inst net = InstructionContinue v \<Longrightarrow>
-   inst \<notin> {Misc STOP, Misc RETURN, Misc SUICIDE} \<union> range Unknown \<union> (if before_homestead net then {Misc DELEGATECALL} else {}) \<Longrightarrow>
   \<not> vctx_gas var \<le> 0 \<Longrightarrow>
   program_content (cctx_program const) (vctx_pc var) = Some inst \<Longrightarrow>
   vctx_gas v < vctx_gas var"
+  apply (frule instruction_sem_continuing)
   apply (cut_tac meter_gas_gt_0[where inst=inst and var=var and const=const and net=net]; simp)
   apply (simp only: instruction_sem_def)
   apply (case_tac inst; clarsimp)
@@ -194,6 +194,18 @@ lemma inst_sem_gas_consume:
   apply (case_tac "x13"; clarsimp simp: instruction_sem_simps  split: pc_inst.splits option.splits list.splits if_splits)
     done
 
+
+lemma inst_sem_cont_gas_decrease:
+ "instruction_sem var const inst net = InstructionContinue x1
+ \<Longrightarrow> \<not> vctx_gas var \<le> 0
+ \<Longrightarrow> vctx_next_instruction var const = Some inst
+ \<Longrightarrow> meter_gas inst var const net \<le> vctx_gas var
+ \<Longrightarrow> vctx_gas x1 < vctx_gas var"
+     apply (frule instruction_sem_continuing)
+     apply (erule (1) inst_sem_gas_consume)
+  apply (simp add: vctx_next_instruction_def split:option.splits)
+done
+
 termination program_sem_t
   apply (relation "measure (\<lambda>(c,net,ir). nat (case ir of InstructionContinue v \<Rightarrow>  vctx_gas v | _ \<Rightarrow> 0))")
    apply (simp)
@@ -201,12 +213,9 @@ termination program_sem_t
   subgoal for const net var inst
     apply (case_tac "instruction_sem var const inst net" ; simp)
     apply (clarsimp simp add: check_resources_def prod.case_eq_if )
-     apply (frule instruction_sem_continuing)
-     apply (erule (2) inst_sem_gas_consume)
-  apply (simp add: vctx_next_instruction_def split:option.splits)
-    done
-done
-    
+    by (erule inst_sem_cont_gas_decrease)
+ done
+
 lemma program_sem_t_no_gas_not_continuing:
   "\<lbrakk>vctx_gas var \<le> 0 \<rbrakk> \<Longrightarrow>
 \<forall>v. program_sem_t const net (InstructionContinue var) \<noteq> InstructionContinue v"
