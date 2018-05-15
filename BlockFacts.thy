@@ -20,53 +20,63 @@ theory BlockFacts
          "attic/Apply_Trace_Cmd"
 begin
 
-lemma
-  "program_sem_t (g_cctx g) net (InstructionContinue ir) = InstructionContinue ir'
-  \<Longrightarrow> \<not> vctx_gas ir \<le> 0
-  \<Longrightarrow> vctx_gas ir' < vctx_gas ir"
-  apply (induct arbitrary: ir rule: program_sem_t.induct)
+
+lemma env_step_instruction_continue:
+ "Continue g' = envstep net g
+  \<Longrightarrow> \<exists>x. g_vmstate g' = InstructionContinue x"
+  apply (clarsimp simp: envstep_def Let_def)
+  apply (cases "g_vmstate g" ; clarsimp)
+  apply (rename_tac action x y)
+  apply (case_tac action ; clarsimp simp : Let_def split: if_split_asm list.splits stack_hint.splits)
+done
+
+lemma env_step_keep_pos:
+ "\<not> get_vctx_gas g \<le> 0
+ \<Longrightarrow> Continue g' = envstep net g
+ \<Longrightarrow> \<not> get_vctx_gas g' \<le> 0"
+oops 
+
+
+lemma program_sem_t_not_continue:
+   " program_sem_t const net ir \<noteq> InstructionContinue z"
+ using program_sem_t_in_program_sem[where const=const and net=net and ir=ir]
   apply clarsimp
-  apply (simp add: program_sem_t.simps split: option.splits )
-    apply (clarsimp simp add: check_resources_def prod.case_eq_if  split:if_splits)
-(* apply (drule (3) inst_sem_cont_gas_decrease)
- apply (frule (1) inst_sem_gas_consume)
-  apply (clarsimp simp: vctx_next_instruction_def inst_stack_numbers.simps split: option.splits)
-using instruction_sem_not_continuing[where inst="Misc STOP", simplified]
-  apply (simp add: program_sem_t.simps)
-*)
-oops
+  apply (drule_tac x=k in spec)+
+  apply clarsimp
+  apply (drule_tac x=z in spec)+
+  apply clarsimp
+done
+
+lemma program_sem_not_incrase:
+ "program_sem_t (g_cctx g) net (InstructionContinue x) =  InstructionToEnvironment act ctx x23 \<Longrightarrow>
+ get_vctx_gas y = vctx_gas ctx \<Longrightarrow>
+ get_vctx_gas y \<le> get_vctx_gas g"
+sorry
+
+lemma global_step_not_increase_gas:
+  "\<not> get_vctx_gas g \<le> 0
+   \<Longrightarrow> Continue g'= global_step net (g\<lparr>g_vmstate := InstructionContinue x\<rparr>)
+   \<Longrightarrow> (get_vctx_gas g') \<le> (get_vctx_gas g)"
+ apply (clarsimp simp: global_step_def)
+ apply (cases "program_sem_t (g_cctx g) net (InstructionContinue x)"; clarsimp)
+  using program_sem_t_not_continue apply fastforce
+ apply (clarsimp simp: envstep_def Let_def split: contract_action.splits if_splits)
+  apply (erule program_sem_not_incrase)
+sorry
 
 termination global_sem
-  apply (relation "measure (\<lambda>(net,gs). nat
-  (case gs of
-     Continue g \<Rightarrow> 
-      (case g_vmstate g of
-     InstructionContinue vctx \<Rightarrow>  vctx_gas vctx
-   | InstructionToEnvironment act vctx _ \<Rightarrow> vctx_gas vctx)
-  | Unimplemented \<Rightarrow> 0
-  | Finished _\<Rightarrow> 0))")
-   apply (simp)
-  apply (simp only: measure_def inv_image_def split_def)
-  apply (clarsimp simp: get_vctx_gas.simps split:instruction_result.splits)
-  apply (rule conjI, clarsimp simp: get_vctx_gas.simps)+
-defer
+  apply (relation "((\<lambda>(net,gs). nat (get_vctx_gas gs))) <*mlex*>
+                   (measure (\<lambda>(net,gs). get_callstack_length gs))")
+  apply (rule wf_mlex)
+  apply simp
 
-  apply (clarsimp simp: get_vctx_gas.simps split:instruction_result.splits)
-defer
-  apply (clarsimp simp: get_vctx_gas.simps split:instruction_result.splits)
-  apply (rule conjI, clarsimp simp: get_vctx_gas.simps)+
-defer  
-  apply (clarsimp simp: get_vctx_gas.simps split:instruction_result.splits)
-  apply (simp add: bigstep_def Let_def)
-  apply(case_tac "g_vmstate gs "; clarsimp)
-  subgoal for const net var inst
-    apply (case_tac "instruction_sem var const inst net" ; simp)
-    apply (clarsimp simp add: check_resources_def prod.case_eq_if )
-     apply (frule instruction_sem_continuing)
-     apply (erule (2) inst_sem_gas_consume)
-  apply (simp add: vctx_next_instruction_def split:option.splits)
-    done
-done
-    
-l
+  apply (clarsimp simp: mlex_eq)
+  apply (frule (1) global_step_not_increase_gas)
+  apply (drule mp)
+   apply (erule nat_mono)
+  apply (rule ccontr)
+  apply (erule notE) back
+  apply simp
+
+oops
 end

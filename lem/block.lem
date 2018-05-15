@@ -492,11 +492,8 @@ let step net = function
     end
 end
 
-val envstep: network -> global_state -> global_state
-let envstep net = function
- | Finished st -> Finished st
- | Unimplemented -> Unimplemented
- | Continue global ->
+val envstep: network -> global -> global_state
+let envstep net global =
     let orig = global.g_orig in
     let c = global.g_cctx in
     let state = global.g_current in
@@ -613,41 +610,40 @@ let envstep net = function
     | a -> 
       Continue global
     end
-end
 
 
-val get_vctx_gas: instruction_result -> integer
-let get_vctx_gas ir =
-  match ir with
+val get_vctx_gas: global -> integer
+let get_vctx_gas g =
+  match g.g_vmstate with
   | InstructionContinue v -> v.vctx_gas
   | InstructionToEnvironment _ v _ -> v.vctx_gas
   end
 
-val global_sem: network -> global_state -> maybe tr_result
-let rec global_sem net gs =
-  match gs with
-  | Continue g ->
-    if get_vctx_gas g.g_vmstate <= 0 then
-        Nothing
-    else
-    let c = g.g_cctx in
-    match g.g_vmstate with
-    | InstructionContinue ir ->
-      let ng = <| g with g_vmstate = program_sem_t c net (InstructionContinue ir) |> in
-      global_sem net (Continue ng)
-    | InstructionToEnvironment _ ir _ ->
-      let ng = envstep net (Continue g) in
-      match ng with
-      | Continue g' -> 
-          let ng' = <| g' with g_vmstate = program_sem_t c net g'.g_vmstate |> in
-          global_sem net (Continue ng')
-      | Unimplemented  -> Nothing
-      | Finished tr -> Just tr
-      end
+val get_callstack_length: global -> nat
+let get_callstack_length g = List.length (g.g_stack)
+
+val global_step: network -> global -> global_state
+let global_step net g =
+  let ir = program_sem_t g.g_cctx net g.g_vmstate in
+  let g' = <| g with g_vmstate = ir |> in
+  envstep net g'
+
+val global_sem: network -> global -> maybe tr_result
+let rec global_sem net g =
+  if get_vctx_gas g <= 0 then
+      Nothing
+  else
+  match g.g_vmstate with
+  | InstructionContinue ir ->
+    let gy = <| g with g_vmstate = InstructionContinue ir |> in
+    let g' = global_step net gy in
+    match g' with
+    | Continue gx -> global_sem net gx
+    | Unimplemented -> Nothing
+    | Finished tr -> Just tr
     end
- | Unimplemented -> Nothing
- | Finished tr -> Just tr
- end
+  | _ -> Nothing
+  end
 
 val txdatacost : list byte -> integer
 let rec txdatacost lst = match lst with
