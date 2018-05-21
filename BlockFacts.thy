@@ -47,8 +47,28 @@ lemma program_sem_t_not_continue:
   apply clarsimp
 done
 
-lemma program_sem_not_incrase:
- "program_sem_t (g_cctx g) net (InstructionContinue x) =  InstructionToEnvironment act ctx x23 \<Longrightarrow>
+fun instr_gas
+  where "instr_gas (InstructionContinue x) = vctx_gas x" |
+        "instr_gas (InstructionToEnvironment a ctx b) = vctx_gas ctx"
+
+lemma program_sem_not_increase:
+ "instr_gas (program_sem (\<lambda>_. ()) g k net x) \<le> instr_gas x"
+  apply(induct k arbitrary: x)
+   apply(simp add: program_sem.simps)+
+  apply(simp add: next_state_def)
+  apply(case_tac x; clarsimp)
+   apply(case_tac "vctx_next_instruction x1 g"; clarsimp)
+    apply(subst program_sem_ItoE)
+    apply simp
+   apply(rule conjI, clarsimp)+
+  apply(drule meta_spec, erule order_trans)
+  sorry
+
+
+
+lemma program_sem_t_not_increase:
+ "program_sem_t (g_cctx g) net (InstructionContinue x) = InstructionToEnvironment act ctx x23 \<Longrightarrow>
+  vctx_gas x \<le> get_vctx_gas g \<Longrightarrow>
  get_vctx_gas y = vctx_gas ctx \<Longrightarrow>
  get_vctx_gas y \<le> get_vctx_gas g"
 sorry
@@ -61,7 +81,7 @@ lemma global_step_not_increase_gas:
  apply (cases "program_sem_t (g_cctx g) net (InstructionContinue x)"; clarsimp)
   using program_sem_t_not_continue apply fastforce
  apply (clarsimp simp: envstep_def Let_def split: contract_action.splits if_splits)
-  apply (erule program_sem_not_incrase)
+  apply (erule program_sem_t_not_increase)
 sorry
 
 termination global_sem
