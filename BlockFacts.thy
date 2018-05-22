@@ -30,13 +30,6 @@ lemma env_step_instruction_continue:
   apply (case_tac action ; clarsimp simp : Let_def split: if_split_asm list.splits stack_hint.splits)
 done
 
-lemma env_step_keep_pos:
- "\<not> get_vctx_gas g \<le> 0
- \<Longrightarrow> Continue g' = envstep net g
- \<Longrightarrow> \<not> get_vctx_gas g' \<le> 0"
-oops 
-
-
 lemma program_sem_t_not_continue:
    " program_sem_t const net ir \<noteq> InstructionContinue z"
  using program_sem_t_in_program_sem[where const=const and net=net and ir=ir]
@@ -68,7 +61,6 @@ lemma Csuicide_ge_0:
   by (auto split: if_splits
            simp add: gas_simps Gsuicide_def)
 
-
 lemma thirdComponentOfC_ge_0:
   "0 \<le> thirdComponentOfC  i s0 s1 s2 s3 recipient_empty orig_val new_val remaining_gas net mmu_extra"
   unfolding thirdComponentOfC_def
@@ -94,7 +86,6 @@ lemma thirdComponentOfC_ge_0:
          apply (clarsimp simp: Csuicide_ge_0 Ccall_ge_0 Gzero_def  Gcreate_def  split:if_splits)
          done
 
-
 lemma meter_gas_ge_0:
  " 0 \<le> meter_gas inst var const net"
   using Cmem_lift[OF
@@ -107,6 +98,16 @@ apply( simp add: new_memory_consumption.simps vctx_next_instruction_default_def 
  apply (case_tac x)
  apply (simp add: max_def new_memory_consumption.simps vctx_next_instruction_default_def thirdComponentOfC_ge_0  split: if_splits)+
 done
+
+lemmas inst_sem_simps =
+  instruction_failure_result_def stack_0_0_op_def  stack_0_1_op_def
+  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps 
+  meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def
+  mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def
+  jump_def jumpi_def strict_if_def blockedInstructionContinue_def
+  blocked_jump_def  pc_def pop_def swap_def log_def delegatecall_def
+  ret_def stop_def create_def vctx_advance_pc_def call_def callcode_def
+  suicide_def
 
 lemma instr_gas_le_vctx_gas:
  "vctx_next_instruction ctx c = Some inst
@@ -121,43 +122,15 @@ lemma instr_gas_le_vctx_gas:
  apply (drule program_sem_no_gas_not_continuing'[where c=c and net=net])
   apply (drule_tac x=1 in spec)
   apply simp
-  apply (drule_tac x="x1" in spec)
+  apply (rename_tac x)
+  apply (drule_tac x="x" in spec)
   apply (simp add: program_sem.simps next_state_def)
   apply (simp add: instruction_sem_def)
   apply (case_tac inst ;clarsimp)
-  apply (clarsimp simp add: instruction_failure_result_def)
- apply (clarsimp simp add:  subtract_gas.simps meter_gas_ge_0)
-  apply (case_tac x2 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def  stack_2_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 split: list.splits)+
-  apply (case_tac x3 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def  stack_2_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 split: list.splits)+
-  apply (case_tac x4 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def split: list.splits if_splits)+
-  apply (case_tac x5 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def   stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def split: option.splits list.splits if_splits)+
-  apply (case_tac x7 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def   stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def mstore8_def calldatacopy_def codecopy_def extcodecopy_def split: option.splits list.splits if_splits)+
-  apply (case_tac x8 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def   stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def split: option.splits list.splits if_splits)+
-  apply (case_tac x9 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def   stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def jump_def split: option.splits list.splits if_splits)+
-  apply (case_tac x2 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def   stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def jump_def split: option.splits list.splits if_splits)+
-  apply (case_tac x9 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def   stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def jump_def jumpi_def strict_if_def blockedInstructionContinue_def blocked_jump_def  split: option.splits list.splits if_splits)+
-  apply (case_tac x2 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def   stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def jump_def jumpi_def strict_if_def blockedInstructionContinue_def blocked_jump_def  split: option.splits list.splits if_splits)+
-  apply (case_tac x9 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def stack_0_0_op_def  stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def jump_def jumpi_def strict_if_def blockedInstructionContinue_def blocked_jump_def  pc_def split: option.splits list.splits if_splits)+
-  apply (case_tac x10 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def stack_0_0_op_def  stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def jump_def jumpi_def strict_if_def blockedInstructionContinue_def blocked_jump_def  pc_def pop_def swap_def log_def delegatecall_def split: option.splits list.splits if_splits)+
-  apply (case_tac x12 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def stack_0_0_op_def  stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def jump_def jumpi_def strict_if_def blockedInstructionContinue_def blocked_jump_def  pc_def pop_def swap_def log_def delegatecall_def ret_def split: option.splits list.splits if_splits)+
-  apply (case_tac x13 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def stack_0_0_op_def  stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def jump_def jumpi_def strict_if_def blockedInstructionContinue_def blocked_jump_def  pc_def pop_def swap_def log_def delegatecall_def ret_def stop_def create_def vctx_advance_pc_def call_def callcode_def suicide_def split: option.splits list.splits if_splits)+
-  apply (case_tac x13 ; clarsimp)
- apply (clarsimp simp add: instruction_failure_result_def stack_0_0_op_def  stack_0_1_op_def  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def jump_def jumpi_def strict_if_def blockedInstructionContinue_def blocked_jump_def  pc_def pop_def swap_def log_def delegatecall_def ret_def stop_def create_def vctx_advance_pc_def call_def callcode_def suicide_def split: option.splits list.splits if_splits)+
-done  
+  apply ((rename_tac x, case_tac x; clarsimp),
+         (clarsimp simp: inst_sem_simps
+                   split: option.splits list.splits if_splits)+)+
+done
 
 lemma program_sem_not_increase:
  " instr_gas (program_sem (\<lambda>_. ()) (g_cctx g) k net x) \<le> instr_gas x"
@@ -165,26 +138,16 @@ lemma program_sem_not_increase:
    apply(simp add: program_sem.simps)+
   apply(simp add: next_state_def)
   apply(case_tac x; clarsimp)
-   apply(case_tac "vctx_next_instruction x1 (g_cctx g)"; clarsimp)
+  apply (rename_tac x)
+   apply(case_tac "vctx_next_instruction x (g_cctx g)"; clarsimp)
     apply(subst program_sem_ItoE)
     apply simp
    apply(rule conjI, clarsimp)+
   apply(drule meta_spec, erule order_trans)
-prefer 4
- apply (simp add: program_sem_ItoE)
-prefer 3
   apply clarsimp
- apply (simp add: program_sem_ItoE)
-  apply (drule_tac x="instruction_sem x1 (g_cctx g) a net" in meta_spec)
-  apply clarsimp
-  apply (erule order_trans)
-prefer 3
-  apply clarsimp
- apply (simp add: program_sem_ItoE)
- apply (clarsimp simp: check_resources_def)
  apply (erule (2) instr_gas_le_vctx_gas)
+ apply (simp add: program_sem_ItoE check_resources_def)+
 done
-
 
 lemma program_sem_t_not_increase:
  "program_sem_t (g_cctx g) net (InstructionContinue x) = InstructionToEnvironment act ctx x23 \<Longrightarrow>
@@ -199,10 +162,169 @@ lemma program_sem_t_not_increase:
    apply simp
   apply (drule sym[where s="InstructionToEnvironment _ _ _"])
   apply simp
+done                                        
+  
+lemma xxx:
+ "program_sem_t gc net (InstructionContinue x) = InstructionToEnvironment (ContractCall callarg) vctx retv \<longrightarrow>
+ vctx_gas vctx + uint (callarg_gas callarg) \<le> vctx_gas x"
+(*
+ apply (induct arbitrary: x rule: program_sem_t.induct)
+  apply clarsimp
+  apply (drule_tac x=x in meta_spec)
+  apply clarsimp
+  apply (simp add: instruction_sem_def)
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits)
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
+  apply (simp add: meter_gas_def Let_def C_def thirdComponentOfC_def Ccall_def )
+  apply (fold calc_memu_extra_def)
+  apply (simp add: max_def)
+  apply (rule conjI, clarsimp)+
+ apply (clarsimp simp: Ccallgas_def)
+  apply (rule conjI, clarsimp)+
+*)
+sorry
+
+lemma next_state_ItoE:
+ "next_state st gc net (InstructionToEnvironment act vctx retv) = InstructionToEnvironment act vctx retv "
+  by (simp add: next_state_def)
+
+lemma next_state_call:
+ "next_state st gc net (InstructionContinue x) =  InstructionToEnvironment (ContractCall callarg) vctx retv
+  \<Longrightarrow>
+ vctx_next_instruction x gc \<in> Some ` { (Misc CALL), (Misc CALLCODE)}"
+ apply (clarsimp simp: next_state_def)
+  apply (clarsimp split: option.splits if_splits)
+  apply (clarsimp simp: instruction_sem_def)
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)+
 done
+
+lemma program_sem_last_step:
+ "program_sem st gc k net (InstructionContinue x) = InstructionToEnvironment (ContractCall callarg) vctx retv
+ \<Longrightarrow> \<exists>x'. k>0
+  \<and> ((1 < k \<and> program_sem st gc (k - 1) net (InstructionContinue x) = InstructionContinue x') \<or> (k = 1 \<and> x=x') )
+  \<and> program_sem st gc 1 net (InstructionContinue x') = InstructionToEnvironment (ContractCall callarg) vctx retv"
+ apply (induct k arbitrary: x)
+  apply (simp add: program_sem.simps)
+  apply (simp add: program_sem.simps)
+
+  apply (cut_tac ?pr1.0="(InstructionContinue x)" in next_state_def[where stopper=st and c=gc and net=net]) 
+  apply simp
+ apply (thin_tac "next_state st gc net (InstructionContinue x) = _")
+   apply (clarsimp split: option.splits simp add: program_sem_ItoE)
+   apply (clarsimp split: if_splits simp: program_sem_ItoE)
+find_theorems name:program_sem 
+
+(*    apply (case_tac k; clarsimp)
+   apply (simp add: program_sem.simps)
+   apply (simp add: next_state_def)
+   apply (rule_tac x=x in exI)
+   apply clarsimp
+  *)
+ apply (clarsimp simp: instruction_sem_def)
+ 
+
+
+    apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps   program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (drule meta_spec, drule (1) meta_mp)
+  apply (clarsimp)
+apply(erule disjE)
+  apply (rule_tac x=x' in exI)
+  apply clarsimp
+  apply (case_tac k; clarsimp)
+apply(simp (no_asm) add: program_sem.simps next_state_def)
+ apply(simp split: option.splits add: instruction_sem_def inst_sem_simps)
+apply clarsimp
+apply(rule_tac x="(x\<lparr>vctx_pc := vctx_pc x + inst_size (Bits inst_AND), vctx_stack := [x21 AND x21a],
+               vctx_gas := vctx_gas x - meter_gas (Bits inst_AND) x gc net,
+               vctx_memory_usage :=
+                 new_memory_consumption (Bits inst_AND) (vctx_memory_usage x) (vctx_stack_default 0 x)
+                  (vctx_stack_default 1 x) (vctx_stack_default 2 x) (vctx_stack_default 3 x)
+                  (vctx_stack_default 4 x) (vctx_stack_default 5 x) (vctx_stack_default 6 x)\<rparr>)" in exI)
+apply simp
+apply(simp (no_asm) add: program_sem.simps next_state_def)
+ apply(simp split: option.splits add: instruction_sem_def inst_sem_simps)
+
+prefer 17
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+
+
+
+
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)+
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)+
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)+
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)+
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)+
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)+
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)+
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)+
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)+
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)+
+
+  apply (clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+  apply (rule exI, erule conjI[rotated],
+       simp (no_asm) add: next_state_def, simp add: instruction_sem_def inst_sem_simps)+
+  apply (clarsimp simp: inst_sem_simps program_sem.simps next_state_ItoE
+      program_sem_ItoE split:option.splits if_splits list.splits)
+oops
 
 lemma global_step_not_increase_gas:
   "\<not> get_vctx_gas g \<le> 0 \<Longrightarrow>
+   g_vmstate g = InstructionContinue x \<Longrightarrow>
 vctx_gas x \<le> get_vctx_gas g \<Longrightarrow>
    Continue g'= global_step net (g\<lparr>g_vmstate := InstructionContinue x\<rparr>)
    \<Longrightarrow> (get_vctx_gas g') \<le> (get_vctx_gas g)"
@@ -210,6 +332,9 @@ vctx_gas x \<le> get_vctx_gas g \<Longrightarrow>
  apply (cases "program_sem_t (g_cctx g) net (InstructionContinue x)"; clarsimp)
   using program_sem_t_not_continue apply fastforce
  apply (clarsimp simp: envstep_def Let_def split: contract_action.splits if_splits)
+  apply (simp add: get_vctx_gas_def)
+  apply (erule xxx)
+  apply (rename_tac  vctx retv callarg)
   apply (erule program_sem_t_not_increase)
   apply (simp add: get_vctx_gas_def)
   apply (case_tac "g_vmstate g" ;clarsimp)
@@ -225,9 +350,6 @@ termination global_sem
   apply (frule_tac x=x1 in global_step_not_increase_gas)
 apply(simp add: get_vctx_gas_def)
 apply assumption
-
-
-
   apply (drule mp)
    apply (erule nat_mono)
   apply (rule ccontr)

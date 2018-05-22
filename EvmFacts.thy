@@ -267,7 +267,7 @@ lemma program_sem_t_imp_program_sem:
   done
   
 lemma program_sem_ItoE :
-"program_sem (\<lambda>_. ()) const k net (InstructionToEnvironment a b c) = InstructionToEnvironment a b c"
+"program_sem stp const k net (InstructionToEnvironment a b c) = InstructionToEnvironment a b c"
   apply(induct_tac k, simp add: program_sem.simps next_state_def split: if_split)
   apply(simp add: program_sem.simps next_state_def split: if_split)
   done
