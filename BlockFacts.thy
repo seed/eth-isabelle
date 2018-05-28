@@ -30,6 +30,9 @@ lemma env_step_instruction_continue:
   apply (case_tac action ; clarsimp simp : Let_def split: if_split_asm list.splits stack_hint.splits)
 done
 
+
+subsection "More on program-sem"
+
 lemma program_sem_t_not_continue:
    " program_sem_t const net ir \<noteq> InstructionContinue z"
  using program_sem_t_in_program_sem[where const=const and net=net and ir=ir]
@@ -38,7 +41,28 @@ lemma program_sem_t_not_continue:
   apply clarsimp
   apply (drule_tac x=z in spec)+
   apply clarsimp
-done
+  done
+
+
+lemma program_sem_last_step_split :
+ "program_sem st gc k net (InstructionContinue x) = InstructionToEnvironment z vctx retv \<Longrightarrow>
+  \<exists>x' k'. k' \<le> k \<and> program_sem st gc k' net (InstructionContinue x) = InstructionContinue x' \<and>
+          next_state st gc net (InstructionContinue x') = InstructionToEnvironment z vctx retv"
+  apply (induct k arbitrary: x)
+   apply(simp add: program_sem.simps)+
+  apply(case_tac "next_state st gc net (InstructionContinue x)")
+   apply clarsimp
+   apply(drule meta_spec, drule meta_mp, assumption)
+   apply clarsimp
+   apply(rule_tac x=x' in exI)
+   apply(rule_tac x="Suc k'" in exI, simp add: program_sem.simps)
+  apply clarsimp
+  apply(rule_tac x=x in exI)
+  apply(rule_tac x=0 in exI, simp add: program_sem_ItoE)
+  apply(simp add: program_sem.simps)
+  done
+
+
 
 fun instr_gas
   where "instr_gas (InstructionContinue x) = vctx_gas x" |
@@ -132,14 +156,15 @@ lemma instr_gas_le_vctx_gas:
                    split: option.splits list.splits if_splits)+)+
 done
 
+
 lemma program_sem_not_increase:
- " instr_gas (program_sem (\<lambda>_. ()) (g_cctx g) k net x) \<le> instr_gas x"
+ "instr_gas (program_sem z gcctx k net x) \<le> instr_gas x"
   apply(induct k arbitrary: x)
    apply(simp add: program_sem.simps)+
   apply(simp add: next_state_def)
   apply(case_tac x; clarsimp)
   apply (rename_tac x)
-   apply(case_tac "vctx_next_instruction x (g_cctx g)"; clarsimp)
+   apply(case_tac "vctx_next_instruction x gcctx"; clarsimp)
     apply(subst program_sem_ItoE)
     apply simp
    apply(rule conjI, clarsimp)+
@@ -148,6 +173,8 @@ lemma program_sem_not_increase:
  apply (erule (2) instr_gas_le_vctx_gas)
  apply (simp add: program_sem_ItoE check_resources_def)+
 done
+
+
 
 lemma program_sem_t_not_increase:
  "program_sem_t (g_cctx g) net (InstructionContinue x) = InstructionToEnvironment act ctx x23 \<Longrightarrow>
@@ -158,15 +185,27 @@ lemma program_sem_t_not_increase:
  apply clarsimp
   apply (drule_tac x=k in spec)+
   apply clarsimp
-  apply (cut_tac k=k in program_sem_not_increase[where g="g" and net=net and x="(InstructionContinue x)"])
+  apply (cut_tac k=k in program_sem_not_increase[where z="(\<lambda>_. ())" and  gcctx="g_cctx g" and net=net and x="(InstructionContinue x)"])
    apply simp
   apply (drule sym[where s="InstructionToEnvironment _ _ _"])
   apply simp
 done                                        
-  
-lemma xxx:
- "program_sem_t gc net (InstructionContinue x) = InstructionToEnvironment (ContractCall callarg) vctx retv \<longrightarrow>
+
+
+
+
+lemma program_sem_t_ContractCall_gas :
+ "program_sem_t gc net (InstructionContinue x) = InstructionToEnvironment (ContractCall callarg) vctx retv \<Longrightarrow>
  vctx_gas vctx + uint (callarg_gas callarg) \<le> vctx_gas x"
+  apply(insert program_sem_t_in_program_sem[where const=gc and net=net and ir="InstructionContinue x"])
+  apply clarsimp
+  apply(drule sym, drule program_sem_last_step_split)
+  apply clarify
+  apply(cut_tac z="(\<lambda>_. ())" and gcctx=gc and k=k' and net=net and x="InstructionContinue x" in program_sem_not_increase)
+  apply simp
+  apply(erule order_trans[rotated -1])
+
+
 (*
  apply (induct arbitrary: x rule: program_sem_t.induct)
   apply clarsimp
