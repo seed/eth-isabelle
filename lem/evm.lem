@@ -1335,7 +1335,7 @@ let call net v c = match v.vctx_stack with
      InstructionToEnvironment (ContractCall
          <| callarg_gas = word256FromInteger (Ccallgas g r value
                      (not (v.vctx_account_existence (vctx_recipient v c)))
-                     v.vctx_gas net (calc_memu_extra v.vctx_memory_usage g r value in_begin in_size out_begin out_size));
+                     v.vctx_gas net (calc_memu_extra (max 0 v.vctx_memory_usage) g r value in_begin in_size out_begin out_size));
             callarg_code = w256_to_address r;
             callarg_recipient = w256_to_address r;
             callarg_value = value;
@@ -1378,7 +1378,7 @@ let callcode net v c = match v.vctx_stack with
          (ContractCall
            <| callarg_gas = word256FromInteger (Ccallgas e0 e1 e2
                      (not (v.vctx_account_existence (vctx_recipient v c))) v.vctx_gas net
-                     (calc_memu_extra v.vctx_memory_usage e0 e1 e2 e3 e4 e5 e6));
+                     (calc_memu_extra (max 0 v.vctx_memory_usage) e0 e1 e2 e3 e4 e5 e6));
               callarg_code = w256_to_address e1;
               callarg_recipient = c.cctx_this;
               callarg_value = e2;
