@@ -559,8 +559,11 @@ let envstep net global =
          match global.g_stack with
          | [] -> Finished <| f_state=orig; f_killed=[]; f_gas=0; f_refund=0; f_logs = [] |>
          | (oldstate,v,c,_) :: rest ->
-           let v = <| v with vctx_stack = 0::v.vctx_stack |> in
-           Continue (<| global with g_stack=rest; g_current=oldstate; g_cctx=c; g_vmstate=InstructionContinue v |>)
+           if v.vctx_gas < 0 then
+                Unimplemented
+           else
+             let v = <| v with vctx_stack = 0::v.vctx_stack |> in
+             Continue (<| global with g_stack=rest; g_current=oldstate; g_cctx=c; g_vmstate=InstructionContinue v |>)
          end
       | ContractSuicide dst ->
          let n_dst = <| (state dst) with block_account_balance = (state dst).block_account_balance + (state c.cctx_this).block_account_balance |> in
@@ -570,29 +573,37 @@ let envstep net global =
          match global.g_stack with
          | [] -> Finished (<| f_state = state; f_killed = killed; f_refund = v.vctx_refund; f_gas = v.vctx_gas; f_logs = v.vctx_logs |>)
          | (_,nv,nc,is_new) :: rest ->
-           let n_state = match is_new with
-            | CreateAddress new_addr -> create_account state new_addr []
-            | _ -> state
-           end in
-           
-           if length rest = 0 && global.g_create then
-             Finished <| f_state=n_state; f_killed=killed; f_gas=v.vctx_gas; f_refund=v.vctx_refund; f_logs = v.vctx_logs |> else
-           let acc = n_state nc.cctx_this in
-           let nv = <| nv with vctx_stack = 1::nv.vctx_stack |> in
-           let nv = vctx_update_from_world nv acc n_state v in
-           Continue (<| global with g_stack=rest; g_current=n_state; g_cctx=nc; g_vmstate=InstructionContinue nv; g_killed = killed |>)
+           if nv.vctx_gas < 0 then
+                Unimplemented
+           else
+             let n_state = match is_new with
+              | CreateAddress new_addr -> create_account state new_addr []
+              | _ -> state
+             end in
+             
+             if length rest = 0 && global.g_create then
+               Finished <| f_state=n_state; f_killed=killed; f_gas=v.vctx_gas; f_refund=v.vctx_refund; f_logs = v.vctx_logs |> else
+             let acc = n_state nc.cctx_this in
+             let nv = <| nv with vctx_stack = 1::nv.vctx_stack |> in
+             let nv = vctx_update_from_world nv acc n_state v in
+             Continue (<| global with g_stack=rest; g_current=n_state; g_cctx=nc; g_vmstate=InstructionContinue nv; g_killed = killed |>)
          end
       | ContractReturn bytes ->
          let n_state = update_return state c.cctx_this v in
          match global.g_stack with
          | [] -> Finished <| f_state = n_state; f_killed = global.g_killed; f_refund = v.vctx_refund; f_gas = v.vctx_gas; f_logs = v.vctx_logs |>
          | (_,nv,c,ReturnTo mem_start mem_size) :: rest ->
-           let acc = n_state c.cctx_this in
-           let nv = <| nv with vctx_stack = 1::nv.vctx_stack; vctx_memory = put_return_values nv.vctx_memory bytes mem_start mem_size |> in
-           let nv = vctx_update_from_world nv (acc : block_account) n_state v in
-           Continue (<| global with g_stack=rest; g_current=n_state; g_cctx=c; g_vmstate=InstructionContinue nv |>)
+           if nv.vctx_gas < 0 then
+                Unimplemented
+           else
+             let acc = n_state c.cctx_this in
+             let nv = <| nv with vctx_stack = 1::nv.vctx_stack; vctx_memory = put_return_values nv.vctx_memory bytes mem_start mem_size |> in
+             let nv = vctx_update_from_world nv (acc : block_account) n_state v in
+             Continue (<| global with g_stack=rest; g_current=n_state; g_cctx=c; g_vmstate=InstructionContinue nv |>)
          | (old_state,nv,c,CreateAddress new_addr) :: rest ->
-           if bytes = [] && length rest = 0 && global.g_create then
+           if nv.vctx_gas < 0 then
+                Unimplemented
+           else if bytes = [] && length rest = 0 && global.g_create then
              Finished <| f_state=n_state; f_killed=global.g_killed; f_gas=v.vctx_gas; f_refund=v.vctx_refund; f_logs = v.vctx_logs |> else
            let (n_state, v, ret) =
               if v.vctx_gas < integerFromNat (200*length bytes) && homestead_block <= word256ToInteger v.vctx_block.block_number then
