@@ -414,13 +414,6 @@ definition global_gas  :: " global0 \<Rightarrow> nat "  where
  "global_gas g = nat (get_vctx_gas g) + sum_list (map (\<lambda>(_,vctx,_). nat (vctx_gas vctx)) (g_stack g))"
 
 
-lemma
- "Continue g' = envstep net g
-  \<Longrightarrow> global_gas g' \<le> global_gas g"
-  apply (clarsimp simp: envstep_def Let_def global_gas_def get_vctx_gas_def
-                  split: instruction_result.splits contract_action.splits if_splits) 
-  oops
-
 lemma stop_gas:
  "instruction_sem x' (g_cctx g) (Misc STOP) net = InstructionToEnvironment (ContractReturn x6) x x23
  \<Longrightarrow>  vctx_gas x = vctx_gas x'"
@@ -445,6 +438,12 @@ lemma inst_sem_contract_call:
   apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)+
 done
 
+lemma minus_plus_less:
+ "a < b
+  \<Longrightarrow> y \<le> x
+  \<Longrightarrow> y - b + a < (x::int)"
+  by linarith
+
 lemma global_step_not_increase_gas:
   "\<not> get_vctx_gas g \<le> 0 \<Longrightarrow>
    g_vmstate g = InstructionContinue x \<Longrightarrow>
@@ -467,41 +466,8 @@ lemma global_step_not_increase_gas:
           apply(simp add: global_gas_def get_vctx_gas_def)
          apply (clarsimp simp: vctx_update_from_world_def)
 
-  apply (thin_tac "g' = _")
-  apply(simp add: global_gas_def get_vctx_gas_def stop_gas)
-  apply (rule le_less_trans)
-  apply (rule nat_plus_le)
-  apply (simp add: add.commute)
-  apply (case_tac " vctx_gas x' = vctx_gas x" ; clarsimp)
-  apply (drule mp)
-  apply (subst  nat_add_distrib; simp)
-  apply (erule notE[where P="get_callstack_length _ < _"])
-  apply (simp add: get_callstack_length_def)
-
-
-  apply (clarsimp simp: vctx_update_from_world_def)
-  apply (thin_tac "g' = _")
-  apply(simp add: global_gas_def get_vctx_gas_def stop_gas)
-  apply (rule le_less_trans)
-  apply (rule nat_plus_le)
-  apply (simp add: add.commute)
-  apply (case_tac " vctx_gas x' = vctx_gas x" ; clarsimp)
-  apply (drule mp)
-  apply (subst  nat_add_distrib; simp)
-  apply (erule notE[where P="get_callstack_length _ < _"])
-  apply (simp add: get_callstack_length_def)
-
-  apply (clarsimp simp: vctx_update_from_world_def)
-  apply (thin_tac "g' = _")
-  apply(simp add: global_gas_def get_vctx_gas_def stop_gas)
-  apply (rule le_less_trans)
-  apply (rule nat_plus_le)
-  apply (simp add: add.commute)
-  apply (case_tac " vctx_gas x' = vctx_gas x" ; clarsimp)
-  apply (drule mp)
-  apply (subst  nat_add_distrib; simp)
-  apply (erule notE[where P="get_callstack_length _ < _"])
-  apply (simp add: get_callstack_length_def)
+  apply (clarsimp simp: vctx_update_from_world_def global_gas_def get_vctx_gas_def
+                        stop_gas get_callstack_length_def, fastforce)+
 
  apply (clarsimp simp: envstep_def Let_def split: contract_action.splits if_splits list.splits)
  apply (simp add: global_gas_def get_vctx_gas_def)
@@ -517,10 +483,7 @@ lemma global_step_not_increase_gas:
   apply (thin_tac "g' = _")
   apply (simp add: vctx_advance_pc_def)
 apply (frule Ccallgas_less_meter_gas_call[where net=net and gc="(g_cctx g)"])
- apply (subst diff_less_eq')
-  apply (erule less_trans)
-using diff_less_eq' diff_less_eq
- find_theorems "(?a + ?c = ?b) = ( ?a = ?b -?c)" 
+  apply (erule (1) minus_plus_less)
 sorry
 
 termination global_sem
