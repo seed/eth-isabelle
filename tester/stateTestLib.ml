@@ -89,13 +89,20 @@ exception Skip
 
 let run_tr tr state block net =
   let res = start_transaction tr state block in
-  let rec do_run = function
+(*  let rec do_run = function
    | Finished fi -> fi
    | Unimplemented -> raise Skip
    | a ->
      if debug_mode then debug_state a;
      do_run (step net a) in
   let fi = do_run res in
+*)
+  let fi = 
+    match res with
+    | Finished fi' -> fi'
+    | Unimplemented -> raise Skip
+    | Continue g -> global_sem net g
+    end in
   if debug_mode then begin
     prerr_endline ("Bal " ^ w256dec (fi.f_state tr.tr_from).block_account_balance);
     prerr_endline ("Killed " ^ string_of_int (List.length fi.f_killed));
