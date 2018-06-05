@@ -362,7 +362,6 @@ lemma Ccallgas_less_meter_gas_delegatecall:
   apply (rule add_pos_nonneg[OF Cextra_gt_0 calc_memu_extra2_ge_0])
 done
 
-
 lemma next_state_ContractCall_gas :
 "next_state st gc net (InstructionContinue x) = InstructionToEnvironment (ContractCall callarg) vctx retv \<Longrightarrow>
  vctx_gas vctx + uint (callarg_gas callarg) \<le> vctx_gas x"
@@ -378,7 +377,6 @@ lemma next_state_ContractCall_gas :
   apply (erule Ccallgas_le_meter_gas_call)
   done  
 
-
 lemma program_sem_ContractCall_gas :
  "program_sem st gc k net (InstructionContinue x) = InstructionToEnvironment (ContractCall callarg) vctx retv \<Longrightarrow>
  vctx_gas vctx + uint (callarg_gas callarg) \<le> vctx_gas x"
@@ -388,8 +386,6 @@ lemma program_sem_ContractCall_gas :
   apply(erule order_trans[rotated -1])
   by(erule next_state_ContractCall_gas)
 
-
-
 lemma program_sem_t_ContractCall_gas :
  "program_sem_t gc net (InstructionContinue x) = InstructionToEnvironment (ContractCall callarg) vctx retv \<Longrightarrow>
  vctx_gas vctx + uint (callarg_gas callarg) \<le> vctx_gas x"
@@ -398,63 +394,8 @@ lemma program_sem_t_ContractCall_gas :
   apply(drule sym, erule program_sem_ContractCall_gas)
   done
 
-
-
-lemma global_step_not_increase_gas:
-  "\<not> get_vctx_gas g \<le> 0 \<Longrightarrow>
-   g_vmstate g = InstructionContinue x \<Longrightarrow>
-   vctx_gas x \<le> get_vctx_gas g \<Longrightarrow>
-   Continue g'= global_step net (g\<lparr>g_vmstate := InstructionContinue x\<rparr>) \<Longrightarrow> 
-   get_vctx_gas g' \<le> get_vctx_gas g"
- apply (clarsimp simp: global_step_def)
- apply (cases "program_sem_t (g_cctx g) net (InstructionContinue x)"; clarsimp)
-  using program_sem_t_not_continue apply fastforce
-  apply(drule program_sem_t_last_step_split, clarsimp)
-  apply(cut_tac z="(\<lambda>_. ())" and gcctx="g_cctx g" and k=k and net=net and x="InstructionContinue x" in program_sem_not_increase)
-  apply simp
-  apply(erule order_trans[rotated -1])+
-  apply (frule env_step_instruction_continue)
-  apply (clarsimp simp: get_vctx_gas_def)
- apply (clarsimp simp: next_state_def vctx_next_instruction_def split: option.splits if_splits)
-
-(*
-  apply(insert program_sem_t_in_program_sem[where const="g_cctx g" and net=net and ir="InstructionContinue x"])
-  apply clarify
-  apply (drule sym[where t="program_sem _ _ _ _ _"])
-  apply clarsimp
-  apply(drule sym, drule program_sem_last_step_split)
-  apply clarify
-  apply(cut_tac z="(\<lambda>_. ())" and gcctx="g_cctx g" and k=k' and net=net and x="InstructionContinue x" in program_sem_not_increase)
-  apply simp
-  apply (drule sym[where s="InstructionContinue _"])
- apply (simp add: get_vctx_gas_def)
-  apply(erule order_trans[rotated -1])
-  apply (frule env_step_instruction_continue)
-  apply clarsimp
- apply (clarsimp simp: next_state_def vctx_next_instruction_def split: option.splits if_splits)
-*)
-(*
- apply (clarsimp simp: envstep_def Let_def split: contract_action.splits if_splits)
-   apply (solves \<open>clarsimp simp: instruction_sem_def stop_def subtract_gas.simps \<close>)+
-  apply (clarsimp split: list.splits stack_hint.splits if_splits)
-  apply (clarsimp simp: vctx_update_from_world_def)
-
-  apply (simp add: get_vctx_gas_def)
-  apply (erule program_sem_t_ContractCall_gas)
-  apply (simp add: get_vctx_gas_def)
-using program_sem_t_not_increase
-  apply (simp add: start_env_def)
-  
-  apply (case_tac "g_vmstate g" ;clarsimp)
-*)
-  oops
-
-
-
-
 definition global_gas  :: " global0 \<Rightarrow> nat "  where                  
  "global_gas g = nat (get_vctx_gas g) + sum_list (map (\<lambda>(_,vctx,_). nat (vctx_gas vctx)) (g_stack g))"
-
 
 lemma stop_gas:
  "instruction_sem x' (g_cctx g) (Misc STOP) net = InstructionToEnvironment (ContractReturn x6) x x23
@@ -471,7 +412,7 @@ lemma nat_plus_le:
 lemma inst_sem_contract_call:
  "instruction_sem x gc inst net = InstructionToEnvironment (ContractCall callarg) vctx retv
   \<Longrightarrow>    program_content (cctx_program gc) (vctx_pc x) = Some inst \<Longrightarrow>
- vctx_next_instruction x gc \<in> Some ` { (Misc CALL), (Misc CALLCODE)}"
+ inst \<in> { (Misc CALL), (Misc CALLCODE)}"
 
   apply (clarsimp split: option.splits if_splits)
   apply (clarsimp simp: instruction_sem_def)
@@ -482,7 +423,7 @@ done
 lemma inst_sem_delegate_call:
  "instruction_sem x gc inst net = InstructionToEnvironment (ContractDelegateCall cargs) vctx retv
   \<Longrightarrow> program_content (cctx_program gc) (vctx_pc x) = Some inst
-  \<Longrightarrow> vctx_next_instruction x gc = Some (Misc DELEGATECALL)"
+  \<Longrightarrow> inst = (Misc DELEGATECALL)"
   apply (clarsimp simp: instruction_sem_def)
   apply (case_tac inst ; clarsimp simp: vctx_next_instruction_def split:option.splits)
   apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)+
@@ -491,7 +432,7 @@ done
 lemma inst_sem_contract_return:
  "instruction_sem x gc inst net = InstructionToEnvironment (ContractReturn xs) vctx retv
   \<Longrightarrow> program_content (cctx_program gc) (vctx_pc x) = Some inst
-  \<Longrightarrow> vctx_next_instruction x gc \<in> Some ` {(Misc RETURN), (Misc STOP)}"
+  \<Longrightarrow> inst \<in> {(Misc RETURN), (Misc STOP)}"
   apply (clarsimp simp: instruction_sem_def)
   apply (case_tac inst ; clarsimp simp: vctx_next_instruction_def split:option.splits)
   apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)+
@@ -520,79 +461,82 @@ lemma inst_sem_stop_vctx_gas_eq:
   apply (clarsimp simp: meter_gas_def inst_sem_simps C_def thirdComponentOfC_def Cmem_def gas_simps  new_memory_consumption.simps)
 done
 
-lemma inst_sem_stop_vctx_gas_eq:
- " instruction_sem st (g_cctx g) (Misc RETURN) net = InstructionToEnvironment (ContractReturn []) x y
- \<Longrightarrow> True
- \<Longrightarrow> vctx_gas st = vctx_gas x"
-term index
-  apply (clarsimp simp: instruction_sem_def)
-  apply (clarsimp simp: ret_def vctx_next_instruction_def split:option.splits)
-  apply (clarsimp simp: inst_sem_simps vctx_returned_bytes_def  split:option.splits if_splits list.splits)
-  apply (clarsimp simp: meter_gas_def inst_sem_simps C_def thirdComponentOfC_def Cmem_def gas_simps  new_memory_consumption.simps)
-  apply (clarsimp simp: meter_gas_def inst_sem_simps C_def thirdComponentOfC_def Cmem_def gas_simps  new_memory_consumption.simps vctx_stack_default_def M_def)
-  apply (clarsimp simp: cut_memory_def cut_memory_aux_alt_def iota0.simps)
-  apply (case_tac "unat x21a" ; clarsimp simp: iota0.simps unat_eq_0)
-find_theorems "unat _ = 0 "
-oops
 
-lemma inst_sem_ret_vctx_gas_eq:
- " instruction_sem st (g_cctx g) (Misc RETURN) net = InstructionToEnvironment (ContractReturn z) x y
-\<Longrightarrow> nth (vctx_stack st) 1 = 0
- \<Longrightarrow> vctx_gas st = vctx_gas x"
+lemma uint_expr_neq_0_gt_0:
+ "(uint x21 + uint x21a + 31) div 32 \<noteq> 0 \<Longrightarrow>
+ 0 < (uint x21 + uint x21a + 31) div 32 "
+by uint_arith
 
-  apply (clarsimp simp: instruction_sem_def)
-  apply (clarsimp simp: ret_def vctx_next_instruction_def split:option.splits)
-  apply (clarsimp simp: inst_sem_simps vctx_returned_bytes_def  split:option.splits if_splits list.splits)
-  apply (clarsimp simp: meter_gas_def inst_sem_simps C_def thirdComponentOfC_def Cmem_def gas_simps  new_memory_consumption.simps)
-  apply (clarsimp simp: meter_gas_def inst_sem_simps C_def thirdComponentOfC_def Cmem_def gas_simps  new_memory_consumption.simps vctx_stack_default_def M_def)
+lemma Gmemory_expr_eq_0:
+ "0\<le> x \<Longrightarrow> Gmemory *(x::int) + x * x div 512 = 0 \<Longrightarrow> x = 0"
+  apply (simp add: Gmemory_def)
+  by (metis Divides.transfer_nat_int_function_closures(1) add_le_same_cancel2
+     div_0 div_mult_self4 mult.commute not_less not_numeral_le_zero not_square_less_zero zero_le_numeral)
+
+lemma M_neq_mmu_imp_eq:
+ " M (vctx_memory_usage st) x21 x21a \<noteq> vctx_memory_usage st \<Longrightarrow> M (vctx_memory_usage st) x21 x21a = (uint x21 + uint x21a + 31) div 32"
+   by (clarsimp simp: M_def max_def split:if_splits)
+
+lemma instruction_sem_ret_gas_le:
+ "instruction_sem x' (g_cctx g) (Misc RETURN) net = InstructionToEnvironment (ContractReturn z) x y \<Longrightarrow>
+   vctx_gas x \<le> vctx_gas x'"
+  by (clarsimp simp: instruction_sem_def inst_sem_simps split: list.splits)
+
+lemma instruction_sem_create:
+ "instruction_sem x g inst net = InstructionToEnvironment (ContractCreate x3) x22 x23
+  \<Longrightarrow> program_content (cctx_program g) (vctx_pc x) = Some inst
+  \<Longrightarrow>  inst = Misc CREATE"
+apply (clarsimp simp: instruction_sem_def)
+  apply (case_tac inst ; clarsimp simp: vctx_next_instruction_def split:option.splits)
+  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)+
 done
 
-lemma inst_sem_ret_vctx_gas_gt:
- " instruction_sem st (g_cctx g) (Misc RETURN) net = InstructionToEnvironment (ContractReturn z) x y
-\<Longrightarrow> nth (vctx_stack st) 1 \<noteq> 0
- \<Longrightarrow> vctx_gas x < vctx_gas st"
-  apply (clarsimp simp: instruction_sem_def)
-  apply (clarsimp simp: ret_def vctx_next_instruction_def split:option.splits)
-  apply (clarsimp simp: inst_sem_simps vctx_returned_bytes_def  split:option.splits if_splits list.splits)
-  apply (clarsimp simp: meter_gas_def inst_sem_simps C_def thirdComponentOfC_def Cmem_def gas_simps  new_memory_consumption.simps)
-  apply (clarsimp simp: meter_gas_def inst_sem_simps C_def thirdComponentOfC_def Cmem_def gas_simps  new_memory_consumption.simps vctx_stack_default_def M_def)
+lemma a_minus_b_le_a:
+ "0 \<le> b \<Longrightarrow> a - b \<le> (a::int)"
+  by linarith
+
+lemma L_le:
+ "0 \<le> x \<Longrightarrow> L x \<le> x"
+  by (simp add: L_def)
+
+(* FIXME ME replace the one in EVMFacts.thy *)
+lemma meter_gas_gt_0':
+  " inst \<noteq> Misc STOP \<Longrightarrow>
+    inst \<noteq> Misc RETURN \<Longrightarrow>
+    inst \<noteq> Misc SUICIDE \<Longrightarrow>
+    inst \<notin> range Unknown \<Longrightarrow>
+    inst \<notin>  (if before_homestead net then {Misc DELEGATECALL} else {}) \<Longrightarrow>
+   0 < meter_gas inst var const net"
+
+  using Cmem_lift[OF
+    vctx_memory_usage_never_decreases[where i=inst and v=var]]
+  apply (clarsimp simp add: C_def meter_gas_def Cmem_def Gmemory_def Let_def)
+  apply(case_tac inst)
+apply( simp add: new_memory_consumption.simps vctx_next_instruction_default_def vctx_next_instruction_def;
+   fastforce  intro: ordered_comm_monoid_add_class.add_nonneg_pos 
+          thirdComponentOfC_gt_0) +
 done
 
+lemma inst_sem_create_gas_ge_0:
+ " check_resources x (g_cctx g) (vctx_stack x) (Misc CREATE) net \<Longrightarrow>
+       instruction_sem x (g_cctx g) (Misc CREATE) net =
+       InstructionToEnvironment (ContractCreate x3) y x23 \<Longrightarrow>
+  0 \<le> vctx_gas y \<and> vctx_gas y < vctx_gas x"
+ apply (clarsimp simp:  check_resources_def)
+  apply (clarsimp simp: instruction_sem_def inst_sem_simps split: list.splits)
+  apply (rule meter_gas_gt_0'; clarsimp?)
+done
+ 
 
-lemma
- " instruction_sem st (g_cctx g) inst net = InstructionToEnvironment (ContractReturn z) x y
- \<Longrightarrow> vctx_gas st = vctx_gas x"
+lemma instruction_sem_contract_suicide:
+ "instruction_sem x g inst net = InstructionToEnvironment (ContractSuicide x5) x22 x23
+  \<Longrightarrow> program_content (cctx_program g) (vctx_pc x) = Some inst
+  \<Longrightarrow> inst  = Misc SUICIDE"
   apply (clarsimp simp: instruction_sem_def)
   apply (case_tac inst ; clarsimp simp: vctx_next_instruction_def split:option.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
   apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)+
-
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply(clarsimp simp: inst_sem_simps  split: option.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply(clarsimp simp: inst_sem_simps  split: option.splits)
-  
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (rename_tac x', case_tac x'; clarsimp simp: inst_sem_simps split:option.splits if_splits list.splits)
-  apply (clarsimp simp: meter_gas_def inst_sem_simps C_def thirdComponentOfC_def Cmem_def gas_simps  new_memory_consumption.simps vctx_stack_default_def M_def)
-  apply (clarsimp simp: meter_gas_def inst_sem_simps C_def thirdComponentOfC_def Cmem_def gas_simps  new_memory_consumption.simps vctx_stack_default_def M_def)
-
-apply (clarsimp simp: vctx_returned_bytes_def)
-
 done
-
+  
 lemma global_step_not_increase_gas:
   "\<not> get_vctx_gas g \<le> 0 \<Longrightarrow>
    g_vmstate g = InstructionContinue x \<Longrightarrow>
@@ -630,7 +574,7 @@ lemma global_step_not_increase_gas:
   apply (frule (1) inst_sem_contract_call)
   apply clarsimp
   apply (thin_tac "g' = _")
-  apply (erule disjE[where P="vctx_next_instruction _ _ = _"])
+  apply (erule disjE[where P="_ = Misc _"])
    apply (clarsimp simp: instruction_sem_def vctx_next_instruction_def call_def subtract_gas.simps instruction_failure_result_def split: list.splits)
    apply (simp add: vctx_advance_pc_def)
    apply (frule Ccallgas_less_meter_gas_call[where net=net and gc="(g_cctx g)"])
@@ -647,7 +591,7 @@ lemma global_step_not_increase_gas:
   apply (frule (1) inst_sem_contract_call)
   apply (thin_tac "g' = _")
   apply (clarsimp simp: get_callstack_length_def)
-  apply (erule disjE[where P="vctx_next_instruction _ _ = _"])
+  apply (erule disjE[where P="_ = Misc _"])
 (* ContractCall CALL *)
 
    apply (clarsimp simp: instruction_sem_def vctx_next_instruction_def call_def subtract_gas.simps instruction_failure_result_def split: list.splits)
@@ -662,7 +606,7 @@ lemma global_step_not_increase_gas:
   apply (rule minus_plus_less_nat)
   apply ( simp add:)
   apply (rule conjI)
-   apply (rule meter_gas_gt_0,clarsimp+)
+   apply (rule meter_gas_gt_0',clarsimp+)
   apply assumption
   apply simp
   apply (clarsimp simp: check_resources_def)
@@ -724,8 +668,56 @@ lemma global_step_not_increase_gas:
   apply (thin_tac "g' = _")
   apply (thin_tac "_ \<longrightarrow> _")
  apply (simp add: global_gas_def get_vctx_gas_def start_env_def)
+ apply (frule (1) instruction_sem_create)
+  apply (clarsimp simp: instruction_sem_def create_def instruction_failure_result_def vctx_advance_pc_def subtract_gas.simps split: list.splits)
+  apply (drule meter_gas_gt_0[where inst="Misc CREATE" and net=net, simplified, rotated -1], clarsimp)
+  apply clarsimp
+  apply simp
 
-prefer 6
+  apply (thin_tac "g' = _")
+ apply (simp add: global_gas_def get_vctx_gas_def create_env_def get_callstack_length_def )
+ apply (frule (1) instruction_sem_create)
+ apply clarsimp
+  apply (frule (1) inst_sem_create_gas_ge_0)
+  apply clarsimp
+ apply (subst nat_diff_distrib)
+  apply (simp add: L_def)
+  apply (erule L_le)
+  apply (subst add_diff_assoc)
+  apply (rule nat_mono)
+  apply (simp add: L_le)
+  apply simp
+  
+  apply (thin_tac "g' = _")
+ apply (simp add: global_gas_def get_vctx_gas_def create_env_def get_callstack_length_def )
+ apply (frule (1) instruction_sem_create)
+  apply (clarsimp simp: instruction_sem_def create_def instruction_failure_result_def vctx_advance_pc_def subtract_gas.simps split: list.splits)
+  apply (drule meter_gas_gt_0[where inst="Misc CREATE" and net=net, simplified, rotated -1], clarsimp)
+  apply clarsimp
+  apply simp
+
+(* ContractFail *)
+ apply (thin_tac "g' = _")
+ apply (simp add: global_gas_def get_vctx_gas_def )
+
+ apply (thin_tac "g' = _")
+ apply (simp add: global_gas_def get_vctx_gas_def get_callstack_length_def vctx_update_from_world_def )
+ apply (frule (1) instruction_sem_contract_suicide)
+  apply (clarsimp simp: instruction_sem_def suicide_def instruction_failure_result_def vctx_advance_pc_def subtract_gas.simps split: list.splits)
+
+  apply (erule neq_le_trans)
+  apply (rule le_trans[rotated])
+ apply (rule add_mono)
+  apply (erule nat_mono)
+  apply (rule le_refl)
+  apply (rule le_trans, rule nat_plus_le)
+  apply simp
+  apply (rule nat_mono)
+  apply (rule order_trans)
+ apply (rule a_minus_b_le_a)
+  apply (rule meter_gas_ge_0)
+  apply (rule order_refl)
+
 (* ContractReturn *)
   apply (frule (1) inst_sem_contract_return)
  apply (clarsimp split: stack_hint.splits if_splits)
@@ -733,8 +725,54 @@ prefer 6
  apply (simp add: global_gas_def get_vctx_gas_def vctx_update_from_world_def )
   apply (thin_tac "g' = _")
  apply (simp add: global_gas_def get_vctx_gas_def vctx_update_from_world_def get_callstack_length_def )
+  apply (erule neq_le_trans)
+  apply (rule le_trans[rotated])
+ apply (rule add_mono)
+  apply (erule nat_mono)
+  apply (rule le_refl)
+  apply (rule le_trans, rule nat_plus_le)
+  apply simp
+  apply (rule nat_mono)
+  apply (erule disjE)
+   apply (clarsimp simp: instruction_sem_ret_gas_le)
+  apply (simp add: stop_gas)
 
-sorry
+  apply (thin_tac "g' = _")
+ apply (simp add: global_gas_def get_vctx_gas_def vctx_update_from_world_def get_callstack_length_def )
+  apply (erule neq_le_trans)
+  apply (rule le_trans[rotated])
+ apply (rule add_mono)
+  apply (erule nat_mono)
+  apply (rule le_refl)
+  apply (rule le_trans, rule nat_plus_le)
+  apply simp
+  apply (rule nat_mono)
+  apply (rule order_trans)
+ apply (rule a_minus_b_le_a)
+  apply simp
+  apply (erule disjE)
+   apply (clarsimp simp: instruction_sem_ret_gas_le)
+  apply (simp add: stop_gas)
+
+  apply (thin_tac "g' = _")
+ apply (simp add: global_gas_def get_vctx_gas_def vctx_update_from_world_def get_callstack_length_def )
+  apply (erule neq_le_trans)
+  apply (rule le_trans[rotated])
+ apply (rule add_mono)
+  apply (erule nat_mono)
+  apply (rule le_refl)
+  apply (rule le_trans, rule nat_plus_le)
+  apply simp
+  apply (rule nat_mono)
+  apply (erule disjE)
+   apply (clarsimp simp: instruction_sem_ret_gas_le)
+  apply (simp add: stop_gas)
+
+ apply (clarsimp simp: envstep_def Let_def split: contract_action.splits if_splits list.splits)
+ apply (simp add: global_gas_def get_vctx_gas_def vctx_update_from_world_def get_callstack_length_def )
+ apply (clarsimp simp: envstep_def Let_def split: contract_action.splits if_splits list.splits)
+ apply (simp add: global_gas_def get_vctx_gas_def vctx_update_from_world_def get_callstack_length_def )
+done
 
 termination global_sem
   apply (relation "(\<lambda>(net,gs). global_gas gs) <*mlex*>
