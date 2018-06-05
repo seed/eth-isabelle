@@ -98,11 +98,14 @@ let run_tr tr state block net =
   let fi = do_run res in
 *)
   let fi = 
-    match res with
+    (match res with
     | Finished fi' -> fi'
     | Unimplemented -> raise Skip
-    | Continue g -> global_sem net g
-    end in
+    | Continue g ->
+        match global_sem net g with
+        | Some v -> v
+        | None -> raise Skip
+    ) in
   if debug_mode then begin
     prerr_endline ("Bal " ^ w256dec (fi.f_state tr.tr_from).block_account_balance);
     prerr_endline ("Killed " ^ string_of_int (List.length fi.f_killed));

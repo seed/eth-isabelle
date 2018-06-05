@@ -159,10 +159,10 @@ let hash_of_transaction (t : transaction) : Secp256k1.buffer =
   buffer
 
 let sender_of_transaction (t : transaction) : Evm.address =
-  let ctx = Secp256k1.(Context.create [Verify]) in
+  let ctx = Secp256k1.(Context.create [Secp256k1.Context.Verify]) in
   let msg = hash_of_transaction t in (* wow, it looks like I need to implement RLP! *)
   let sign = failwith "sign" in
-  let recovered = Secp256k1.RecoverableSign.recover ctx sign msg in
+  (*let recovered = Secp256k1.RecoverableSign.recover ctx sign msg in *)
   failwith "sender_of_transaction"
 
 type block =
