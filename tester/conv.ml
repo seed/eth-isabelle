@@ -120,18 +120,19 @@ let be_byte_list_of_address (w : Word256.word256) : Word8.word8 list =
   be_byte_list_of_big_int 20 (big_int_of_word256 w)
 
 let char_pair_to_word8 (a, b) : Word8.word8 =
-  byte_of_int (int_of_string ("0x" ^ BatString.of_list [a; b]))
+  byte_of_int (int_of_string ("0x" ^ BatString.of_char a ^ BatString.of_char b))
 
 let rec parse_hex_inner result (str : char list) : Word8.word8 list =
   match str with
   | [] -> List.rev result
   | [x] -> failwith "odd-length hex"
   | a :: b :: rest ->
-     parse_hex_inner ((char_pair_to_word8 (a, b)) :: result) rest
+     let v = char_pair_to_word8 (a, b) in
+     parse_hex_inner (v :: result) rest
 
 let parse_hex_string (str : string) : Word8.word8 list =
   let str =
-    if BatString.starts_with "0x" str then
+    if BatString.starts_with str "0x" then
       BatString.tail str 2
     else
       str in

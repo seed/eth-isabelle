@@ -118,20 +118,21 @@ let format_transaction (t : transaction) : Easy_format.t =
     ] in
   List (("{", ",", "}", list), lst)
 
-let gas_price_as_rlp_obj = failwith "gas_price_as_rlp_obj"
+(* let gas_price_as_rlp_obj = failwith "gas_price_as_rlp_obj"
 let gas_limit_as_rlp_obj = failwith "gas_limit_as_rlp_obj"
 let value_as_rlp_obj = failwith "value_as_rlp_obj"
 let w_as_rlp_obj = failwith "w_as_rlp_obj"
 let r_as_rlp_obj = failwith "r_as_rlp_obj"
 let s_as_rlp_obj = failwith "s_as_rlp_obj"
 
-let lsbs_as_rope = failwith "lsbs_as_rope"
+*)
+let lsbs_as_rope a = Rope.of_string (Big_int.string_of_big_int a)
 
 let to_as_rlp_obj (to_address : Big_int.big_int option) =
   Rlp.RlpData
     (match to_address with
      | None -> Rope.empty
-     | Some a -> lsbs_as_rope 20 a)
+     | Some a -> lsbs_as_rope a)
 
 let rlp_of_transaction (t : transaction) =
   Conv.byte_list_of_rope

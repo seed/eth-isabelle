@@ -6,6 +6,7 @@ open TestResult
 
 let bighex x = Z.format "%x" (Z.of_string (Big_int.string_of_big_int x))
 
+
 let construct_block_info (t : test_case) : block_info =
   let block_number = Conv.word256_of_big_int t.env.currentNumber in
   { block_blockhash = (fun num ->

@@ -14,7 +14,9 @@ module DH = Ecdh (PrimeField)
 module DSA = Ecdsa (PrimeField)
 module F = PrimeField
 
-let curve = PrimeField.lookup_curve "secp256k1"
+
+(* let curve = PrimeField.lookup_curve "secp256k1" *)
+let curve = PrimeField.lookup_curve "test_curve"
 
 let secret_to_address str =
   let sk = Z.of_string_base 16 str in

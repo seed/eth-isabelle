@@ -20,6 +20,7 @@ let test_one_case (path : string) (case_name, test) =
   try
     let block = strip_singleton_list test.BlockchainTestParser.bcCaseBlocks in
     let tr = strip_singleton_list block.BlockchainTestParser.blockTransactions in
+    let _ = Conv.parse_hex_string tr.BlockchainTestParser.transactionData in
     let tr = parsed_transaction_into_model_transaction tr in
     let pre_st = test.BlockchainTestParser.bcCasePreState in
     let pre_st = List.map (fun (a,b,_) -> (a,b)) (StateTestLib.make_state_list pre_st) in
@@ -61,6 +62,6 @@ let test_one_file path =
     ()
 
 let _ =
-  let () = Printf.printf "runBlockchainTest is not running any test yet. \n%!" in
+  let () = Printf.printf "runBlockchainTest is not running any test yet. \n" in
   let () = TraverseJsons.traverse "../tests/BlockchainTests" test_one_file in
   ()
