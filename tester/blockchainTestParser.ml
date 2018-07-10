@@ -159,12 +159,57 @@ let hash_of_transaction (t : transaction) : Secp256k1.buffer =
   let () = List.iteri (Bigarray.Array1.set buffer) hash_as_char_list in
   buffer
 
-let sender_of_transaction (t : transaction) : Evm.address =
+let hex_string_to_byte_string str =
+  let cl = List.map (Conv.char_of_byte) (Conv.parse_hex_string str) in
+  let sl = List.map (String.make 1) cl in
+  String.concat "" sl
+
+
+let rec qdisplayRope (tree : Rlp.t) =
+  let comma = Rope.of_string ", " in
+  let quotation = Rope.of_string "\"" in
+  let quote r = Rope.(concat empty [quotation; r; quotation]) in
+  match tree with
+  | RlpData content -> quote (Rope.of_string "...") (* Ignores content *)
+  | RlpList lst ->
+     Rope.(concat empty
+                  [ Rope.of_string "["
+                  ; concat comma (List.map qdisplayRope lst)
+                  ; Rope.of_string "]"
+                  ])
+
+let qdisplay (tree : Rlp.t) =
+  Rope.to_string (qdisplayRope tree)
+
+
+let char_list_of_big_int n =
+  let v = Conv.byte_list_of_big_int n in
+  List.map Conv.char_of_byte v
+
+let sender_of_transaction (t : transaction) (rlp : string) : Evm.address =
   let ctx = Secp256k1.(Context.create [Secp256k1.Context.Verify]) in
   let msg = hash_of_transaction t in (* wow, it looks like I need to implement RLP! *)
-  let sign = failwith "sign" in
-  (*let recovered = Secp256k1.RecoverableSign.recover ctx sign msg in *)
-  failwith "sender_of_transaction"
+  let buffer = Bigarray.Array1.create Char Bigarray.c_layout 64 in
+  let r = char_list_of_big_int t.transactionR in
+  let s = char_list_of_big_int t.transactionS in
+  let () = List.iteri (Bigarray.Array1.set buffer) (r @ s) in
+  let recid = Big_int.int_of_big_int t.transactionV - 27 (* ??? *) in
+  let recovered = Secp256k1.Sign.read_recoverable_exn ctx recid buffer in
+  let pubkey = Secp256k1.Sign.recover_exn ctx recovered (Secp256k1.Sign.msg_of_bytes_exn msg)  in
+  let bufkey = Secp256k1.Key.to_bytes ctx pubkey in 
+  let xs = ref [] in
+  let _ = for i=0 to Bigarray.Array1.dim bufkey - 1
+  do
+      xs := !xs @ [Bigarray.Array1.get bufkey i] 
+  done  in
+  let ys = List.map (fun x -> Conv.byte_of_int (Char.code x)) !xs in
+  let hash : Keccak.byte list = Keccak.keccak' ys in
+  failwith "sender_of_transaction not finished"  
+
+  (*
+  let _ = Printf.printf "RLP: %s" (qdisplay (Rlp.((decode (Rope.of_string (hex_string_to_byte_string rlp)))))) in
+  Conv.word160_of_big_int (Big_int.big_int_of_int 0)
+  let sign = failwith "sign in sender_of_transaction" in *)
 
 type block =
   { blockHeader : blockHeader

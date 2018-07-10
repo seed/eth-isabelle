@@ -119,6 +119,9 @@ let be_byte_list_of_big_int (target_len : int) (b : Big_int.big_int) =
 let be_byte_list_of_address (w : Word256.word256) : Word8.word8 list =
   be_byte_list_of_big_int 20 (big_int_of_word256 w)
 
+let byte_list_of_big_int (w : Big_int.big_int) : Word8.word8 list =
+  be_byte_list_of_big_int 32 w
+
 let char_pair_to_word8 (a, b) : Word8.word8 =
   byte_of_int (int_of_string ("0x" ^ BatString.of_char a ^ BatString.of_char b))
 
@@ -212,6 +215,9 @@ let string_of_bool_list (lst : bool list) =
 
 let decimal_of_word256 (w : Word256.word256) =
   Big_int.string_of_big_int (big_int_of_word256 w)
+
+let decimal_of_word160 (w : Word160.word160) =
+  Big_int.string_of_big_int (big_int_of_word160 w)
 
 let char_as_byte (c : char) : Word8.word8 =
   byte_of_int (BatChar.code c)

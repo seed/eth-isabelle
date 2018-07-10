@@ -684,7 +684,7 @@ let start_transaction tr state block =
   let igas = calc_igas tr block in
   (* does not work because gas can overflow ... *)
   let nothing = Finished (nothing_happens state tr) in
-  if tr.tr_nonce <> s_acc.block_account_nonce then nothing else
+  if not (tr.tr_nonce = s_acc.block_account_nonce) then nothing else
   if word256ToNatural s_acc.block_account_balance < word256ToNatural tr.tr_value + gas_value then nothing else
   let gas_value = tr.tr_gas_price * tr.tr_gas_limit in
   if word256ToNatural block.block_gaslimit < word256ToNatural tr.tr_gas_limit then nothing else
