@@ -148,13 +148,40 @@ let rlp_of_transaction (t : transaction) =
           ; Rlp.rlpBigInt t.transactionS
           ]))
 
+let rlp_of_transaction_no_sig (t : transaction) =
+  Conv.byte_list_of_rope
+    (Rlp.encode
+       (RlpList
+          [ Rlp.rlpBigInt t.transactionNonce
+          ; Rlp.rlpBigInt t.transactionGasPrice
+          ; Rlp.rlpBigInt t.transactionGasLimit
+          ; to_as_rlp_obj t.transactionTo
+          ; Rlp.rlpBigInt t.transactionValue
+          ]))
+
+let string_of_chars chars = 
+  let buf = Buffer.create (List.length chars) in
+  List.iter (Buffer.add_char buf) chars;
+  Buffer.contents buf
+
+let hexdump xs =
+  let dumpbyte = (fun acc v -> Printf.printf "%s"  (Z.format "%02x" (Word8.word8ToNatural v))) in
+  List.fold_left dumpbyte () xs
+  
 (* rlp_of_transaction returns the keccak hash of the rlp encoding of a transaction *)
 let hash_of_transaction (t : transaction) : Secp256k1.buffer =
+  let _ = Printf.printf "hash_of_transaction() \n" in
+  let _ = Printf.printf "RLP:\n" in
   let rlp : Keccak.byte list = rlp_of_transaction t in
+  let _ = hexdump rlp in
+  let _ = Printf.printf "\n" in
   let hash : Keccak.byte list = Keccak.keccak' rlp in
-  let hash_as_char_list : char list = List.map
-                                        Conv.char_of_byte
-                                        hash in
+  let w256hash = Keccak.keccak rlp in
+  let l = [0x4a; 0xb2; 0x86; 0x76; 0xbf; 0xbd; 0x85; 0x31; 0xc2; 0xc1; 0x9c; 0xbb; 0x44; 0x38; 0x50; 0x62; 0x92; 0x41; 0x8b; 0xf9; 0x46; 0x97; 0x57; 0xe2; 0xbd; 0xd6; 0x4e; 0xdc; 0xe3; 0xd5; 0xb1; 0x50] in 
+  let hash : Keccak.byte list  = List.map Word8.word8FromInt l in
+  let hash_as_char_list : char list = List.map Conv.char_of_byte hash in
+  let _ = Printf.printf "MSG:\n" in
+  let _ = Printf.printf "%s\n" (StateTestLib.w256hex w256hash) in
   let buffer = Bigarray.Array1.create Bigarray.Char Bigarray.c_layout (List.length hash_as_char_list) in
   let () = List.iteri (Bigarray.Array1.set buffer) hash_as_char_list in
   buffer
@@ -181,30 +208,55 @@ let rec qdisplayRope (tree : Rlp.t) =
 let qdisplay (tree : Rlp.t) =
   Rope.to_string (qdisplayRope tree)
 
-
 let char_list_of_big_int n =
-  let v = Conv.byte_list_of_big_int n in
-  List.map Conv.char_of_byte v
+  let v = Conv.word256_of_big_int n in 
+  let w = Evm.word_rsplit256 v in
+  List.map Conv.char_of_byte w
 
 let sender_of_transaction (t : transaction) (rlp : string) : Evm.address =
   let ctx = Secp256k1.(Context.create [Secp256k1.Context.Verify]) in
   let msg = hash_of_transaction t in (* wow, it looks like I need to implement RLP! *)
   let buffer = Bigarray.Array1.create Char Bigarray.c_layout 64 in
+  let _ = Printf.printf "transactionR = 0x%s\n" (StateTestLib.w256hex (Conv.word256_of_big_int t.transactionR)) in
+  let _ = Printf.printf "transactionS = 0x%s\n" (StateTestLib.w256hex (Conv.word256_of_big_int t.transactionS)) in
+  let _ = Printf.printf "transactionV = 0x%s\n" (StateTestLib.w256hex (Conv.word256_of_big_int t.transactionV)) in
   let r = char_list_of_big_int t.transactionR in
   let s = char_list_of_big_int t.transactionS in
   let () = List.iteri (Bigarray.Array1.set buffer) (r @ s) in
+  let _ = Printf.printf "buffer\n" in
+  let _ = for i=0 to Bigarray.Array1.dim buffer - 1
+  do
+      Printf.printf "%02x " (Char.code (Bigarray.Array1.get buffer i))
+  done  in
+  let _ = Printf.printf "\nmsg\n" in
+  let _ = for i=0 to Bigarray.Array1.dim msg - 1
+  do
+      Printf.printf "%02x " (Char.code (Bigarray.Array1.get msg i))
+  done  in
   let recid = Big_int.int_of_big_int t.transactionV - 27 (* ??? *) in
+  let _ = Printf.printf "\nrecid= %d\n" ( recid) in
+  let _ = Printf.printf "\nbuffer.length %d\n" ( Bigarray.Array1.dim buffer )in
+  let _ = Printf.printf "read_recoverable_exn\n" in
   let recovered = Secp256k1.Sign.read_recoverable_exn ctx recid buffer in
-  let pubkey = Secp256k1.Sign.recover_exn ctx recovered (Secp256k1.Sign.msg_of_bytes_exn msg)  in
-  let bufkey = Secp256k1.Key.to_bytes ctx pubkey in 
+  let _ = Printf.printf "recover_exn\n" in
+  let pubkey = Secp256k1.Sign.recover_exn ctx recovered (Secp256k1.Sign.msg_of_bytes_exn msg) in
+  let _ = Printf.printf "to_bytes\n" in
+  let bufkey = Secp256k1.Key.to_bytes ~compress:false ctx pubkey in 
+  let _ = Printf.printf "buf_key.length %d\n" ( Bigarray.Array1.dim bufkey )in
+
   let xs = ref [] in
   let _ = for i=0 to Bigarray.Array1.dim bufkey - 1
   do
+      let _ = Printf.printf "%02c " (Bigarray.Array1.get bufkey i) in
       xs := !xs @ [Bigarray.Array1.get bufkey i] 
   done  in
   let ys = List.map (fun x -> Conv.byte_of_int (Char.code x)) !xs in
-  let hash : Keccak.byte list = Keccak.keccak' ys in
-  failwith "sender_of_transaction not finished"  
+  let _ = Printf.printf "\nPubkey:\n" in
+  let _ = List.iter (fun v -> Printf.printf "%02x " (Conv.int_of_byte v)) ys in
+  let w256hash = Keccak.keccak ys in
+  let addr = Evm.w256_to_address w256hash in
+  let _ = Printf.printf "\nsender_of_trans: %s\n" (Conv.string_of_address addr) in
+  addr
 
   (*
   let _ = Printf.printf "RLP: %s" (qdisplay (Rlp.((decode (Rope.of_string (hex_string_to_byte_string rlp)))))) in

@@ -4,7 +4,7 @@ exception SkipTest
 
 let parsed_transaction_into_model_transaction (tr : BlockchainTestParser.transaction) (rlp: string) : Block.transaction =
   Block.(
-    { tr_from = Conv.word160_of_big_int (Big_int.big_int_of_int 0) (* BlockchainTestParser.sender_of_transaction tr rlp *)
+    { tr_from = (* Conv.word160_of_big_int (Big_int.big_int_of_int 0) *) BlockchainTestParser.sender_of_transaction tr rlp
     ; tr_nonce = Conv.word256_of_big_int tr.BlockchainTestParser.transactionNonce
     ; tr_to = BatOption.map Conv.word160_of_big_int tr.BlockchainTestParser.transactionTo
     ; tr_gas_limit = Conv.word256_of_big_int tr.BlockchainTestParser.transactionGasLimit

@@ -98,6 +98,7 @@ let rec hex_str_of_bl_inner (acc : string) (bs : Word8.word8 list) : string =
 let hex_string_of_byte_list (prefix : string) (bs : Word8.word8 list) : string =
   prefix^(hex_str_of_bl_inner "" bs)
 
+(*
 let rec be_byte_list_of_big_int_compact_inner (ret : Word8.word8 list) b =
   if Big_int.(eq_big_int zero_big_int b) then ret
   else
@@ -121,6 +122,7 @@ let be_byte_list_of_address (w : Word256.word256) : Word8.word8 list =
 
 let byte_list_of_big_int (w : Big_int.big_int) : Word8.word8 list =
   be_byte_list_of_big_int 32 w
+*)
 
 let char_pair_to_word8 (a, b) : Word8.word8 =
   byte_of_int (int_of_string ("0x" ^ BatString.of_char a ^ BatString.of_char b))
