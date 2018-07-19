@@ -136,6 +136,7 @@ let rec parse_hex_inner result (str : char list) : Word8.word8 list =
      parse_hex_inner (v :: result) rest
 
 let parse_hex_string (str : string) : Word8.word8 list =
+  let _ = Printf.printf "hx-str: %s\n" str in
   let str =
     if BatString.starts_with str "0x" then
       BatString.tail str 2

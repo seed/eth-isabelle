@@ -57,7 +57,7 @@ let make_state_list lst =
 let w256hex i = Z.format "%064x" (Word256.word256ToNatural i)
 let w256dec i = Z.format "%d" (Word256.word256ToNatural i)
 let w160hex i = Z.format "%020x" (Word160.word160ToNatural i)
-let w8hex i = Z.format "%x" (Word8.word8ToNatural i)
+let w8hex i = Z.format "%02x" (Word8.word8ToNatural i)
 let w256dec i = Z.format "%d" (Word256.word256ToNatural i)
 
 let string_of_transaction tr =
