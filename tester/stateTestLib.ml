@@ -56,7 +56,7 @@ let make_state_list lst =
 
 let w256hex i = Z.format "%064x" (Word256.word256ToNatural i)
 let w256dec i = Z.format "%d" (Word256.word256ToNatural i)
-let w160hex i = Z.format "%020x" (Word160.word160ToNatural i)
+let w160hex i = Z.format "%040x" (Word160.word160ToNatural i)
 let w8hex i = Z.format "%02x" (Word8.word8ToNatural i)
 let w256dec i = Z.format "%d" (Word256.word256ToNatural i)
 
@@ -71,7 +71,8 @@ let string_of_transaction tr =
   "\ntr_gas_price  = 0x" ^ w256hex tr.tr_gas_price ^ 
   "\ntr_value  = 0x" ^ w256hex tr.tr_value ^ 
   "\ntr_nonce  = 0x" ^ w256hex tr.tr_nonce ^ 
-  "\ntr_data  = " ^ String.concat " " (*List.map w8hex tr.tr_data*)[] ^ "}\n"
+  "\ntr_data  = " ^ String.concat " " (*List.map w8hex tr.tr_data*)[] ^
+  "\n}\n"
 
 let string_of_block_info (bi: block_info) : string =
   "block {" ^
@@ -81,7 +82,7 @@ let string_of_block_info (bi: block_info) : string =
   "\nblock_timestamp = " ^ w256dec (bi.block_timestamp) ^
   "\nblock_difficulty = " ^ w256dec (bi.block_difficulty) ^ 
   "\nblock_gaslimit = " ^ w256dec (bi.block_gaslimit) ^
-  "}"
+  "\n}\n"
 
 let construct_tr a = {
   tr_from = Conv.word160_of_big_int a.address;
@@ -118,22 +119,31 @@ exception Skip
 let run_tr tr state block net =
   let _ = Printf.printf "\nrun_tr %s\n" (string_of_transaction tr) in
   let res = start_transaction tr state block in
-(*  let rec do_run = function
-   | Finished fi -> fi
-   | Unimplemented -> raise Skip
+  let rec do_run = function
+   | Finished fi ->
+     let _ = Printf.printf "start_transaction() returned Finished\n" in
+     fi
+   | Unimplemented ->
+     let _ = Printf.printf "start_transaction() returned Unimplemented\n" in
+     raise Skip
    | a ->
+     let _ = Printf.printf "start_transaction() returned Continue\n" in
      if debug_mode then debug_state a;
      do_run (step net a) in
-  let fi = do_run res in
-*)
+  (* let fi = do_run res in *)
+  
   let fi = 
     (match res with
-    | Finished fi' -> fi'
-    | Unimplemented -> raise Skip
+    | Finished fi' -> 
+      let _ = Printf.printf "start_transaction() returned Finished\n" in
+      fi'
+    | Unimplemented -> 
+      let _ = Printf.printf "start_transaction() returned Unimplemented\n" in
+      raise Skip
     | Continue g ->
-  let _ = Printf.printf "\ run_tr calling global_sem\n" in
+      let _ = Printf.printf "start_transaction() returned COntinue, calling global_sem\n" in
         match global_sem net g with
-        | Some v -> v
+        | Some fi' -> fi'
         | None -> raise Skip
     ) in
   if debug_mode then begin
@@ -146,7 +156,7 @@ let run_tr tr state block net =
 
 let compare_storage diff_found a stor (p,v) =
   if stor p <> v then begin
-      Printf.printf "address %s has storage %s at %s, but it should be %s!\n" (Conv.string_of_address a)
+      Printf.printf "|||address %s has storage %s at %s, but it should be %s!\n" (Conv.string_of_address a)
        (Conv.decimal_of_word256 (stor p)) (Conv.decimal_of_word256 p) (Conv.decimal_of_word256 v);
       diff_found := true
   end
