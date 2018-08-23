@@ -32,8 +32,17 @@ RUN ./configure --enable-module-recovery
 RUN make
 RUN sudo make install
 # RUN sudo cp include/secp256k1_* /usr/local/include/
+WORKDIR $HOME
+ADD --chown=opam:nogroup https://github.com/dakk/secp256k1-ml/archive/0.4.0.tar.gz .
+RUN tar xf 0.4.0.tar.gz
+WORKDIR $HOME/secp256k1-ml-0.4.0
+RUN opam pin add secp256k1 . -n
+RUN opam lint secp256k1.opam
+RUN opam install -y secp256k1 --deps-only
+RUN opam install -y secp256k1 "-v"
+RUN opam install -y rlp
+# run the tests
 WORKDIR $HOME/tester
-RUN opam install -y secp256k1 rlp
 RUN chmod a+x ./compile.sh
 RUN eval `opam config env` && ./compile.sh
 
