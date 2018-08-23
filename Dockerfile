@@ -9,7 +9,7 @@ RUN mkdir bin
 ENV PATH=$PATH:$HOME/bin
 RUN sudo apk update && sudo apk add m4 perl gmp-dev
 # ocamlbuild and depext are already part of ocaml/opam
-RUN opam install -y ocamlfind batteries yojson bignum easy-format bisect_ppx zarith sha
+RUN opam install -y ocamlfind batteries yojson bignum easy-format bisect_ppx zarith sha rlp
 # install lem
 RUN git clone https://github.com/rems-project/lem lem-src
 WORKDIR $HOME/lem-src
@@ -31,7 +31,7 @@ RUN ./autogen.sh
 RUN ./configure --enable-module-recovery
 RUN make
 RUN sudo make install
-# RUN sudo cp include/secp256k1_* /usr/local/include/
+# install secp256k1 ocaml wrapper
 WORKDIR $HOME
 ADD --chown=opam:nogroup https://github.com/dakk/secp256k1-ml/archive/0.4.0.tar.gz .
 RUN tar xf 0.4.0.tar.gz
@@ -40,7 +40,6 @@ RUN opam pin add secp256k1 . -n
 RUN opam lint secp256k1.opam
 RUN opam install -y secp256k1 --deps-only
 RUN opam install -y secp256k1 "-v"
-RUN opam install -y rlp
 # run the tests
 WORKDIR $HOME/tester
 RUN chmod a+x ./compile.sh
