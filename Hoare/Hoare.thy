@@ -171,7 +171,7 @@ lemma ex_conj_commute:
   by (simp only: conj_commute)
     
 method exI_pick_last_conj =
-  --\<open>Group all conjs on the left and then commute to get the
+  \<comment> \<open>Group all conjs on the left and then commute to get the
      last conjunction element in first position.\<close>
   (simp (no_asm) only: conj_assoc[symmetric],
    subst ex_conj_commute)?,

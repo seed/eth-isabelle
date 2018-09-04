@@ -2,7 +2,7 @@ theory BasicToken
 
 imports
   Dispatcher
-  "~~/src/HOL/Eisbach/Eisbach"
+  "HOL-Eisbach.Eisbach"
 
 begin
 (*
