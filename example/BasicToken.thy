@@ -358,10 +358,77 @@ definition w256 :: "'a::len0 word \<Rightarrow> w256"  where
 definition bytestr :: "'a::len0 word \<Rightarrow> byte list"  where
  "bytestr \<equiv> word_rsplit"
 
+type_synonym erc20_balances = "address \<rightharpoonup> w256"
+
+definition balance_upd :: "address \<Rightarrow> (w256 \<Rightarrow> w256) \<Rightarrow> erc20_balances \<Rightarrow> erc20_balances"
+  where
+ "balance_upd addr upd m \<equiv> m(addr \<mapsto> upd (the (m addr)))"
+
+definition
+ transfer :: "address \<Rightarrow> address \<Rightarrow> w256 \<Rightarrow> erc20_balances \<Rightarrow> erc20_balances"
+ where
+ "transfer from to amount m \<equiv> balance_upd to (\<lambda>v. v + amount) (balance_upd from (\<lambda>v. v - amount) m)"
+
+definition
+ zero :: "address \<Rightarrow> erc20_balances \<Rightarrow> erc20_balances"
+ where
+ "zero addr m \<equiv> m(addr \<mapsto> 0)"
+
 definition
  balances_mapping :: "address \<Rightarrow> w256"
  where
  "balances_mapping addr \<equiv>  keccak (bytestr (w256 addr) @ bytestr (0::w256))"
+
+definition
+ balances_to_storage :: "erc20_balances \<Rightarrow> state_element set \<Rightarrow> bool"
+ where
+ "balances_to_storage m s \<equiv> s = (\<lambda>addr. StorageElm (balances_mapping addr, the (m addr))) ` dom m"
+
+definition
+ addrs_hash_consistency :: "address set \<Rightarrow> bool"
+ where
+ "addrs_hash_consistency s \<equiv>
+   \<forall>a1\<in>s.\<forall>a2 \<in> s. a1 \<noteq> a2 \<longrightarrow> balances_mapping a1 \<noteq> balances_mapping a2"
+
+lemma balances_to_storage_sep':
+ "addrs_hash_consistency (dom m)
+ \<Longrightarrow> m addr = Some v
+ \<Longrightarrow>  balances_to_storage m = (storage (balances_mapping addr) v ** balances_to_storage (m(addr:=None)))"
+  apply (rule ext)
+  apply (rule iffI)
+   apply (clarsimp simp add: sep_basic_simps balances_to_storage_def storage_def)
+   apply (fastforce simp: balances_mapping_def addrs_hash_consistency_def image_def)
+  apply (clarsimp simp: balances_to_storage_def sep_basic_simps  split:if_splits)
+  apply (simp add: image_def storage_def)
+  apply (rule equalityI)
+   apply fastforce
+  apply fastforce
+  done
+
+lemma balances_to_storage_sep:
+ "addrs_hash_consistency (insert addr (dom m))
+ \<Longrightarrow> balances_to_storage (m(addr\<mapsto>v)) = (storage (balances_mapping addr) v ** balances_to_storage (m(addr:=None)))"
+  by (subst  balances_to_storage_sep'[where addr=addr and v=v]; simp)
+
+lemma balances_to_storage_singleton:
+ "a1 \<noteq> a2
+ \<Longrightarrow> balances_to_storage ([a1 \<mapsto> v](a2 := None)) = (storage (balances_mapping a1) v)"
+  apply (rule ext)
+  apply ( simp add: balances_to_storage_def storage_def image_def)
+  done
+
+lemma transfer_sep:
+ "addrs_hash_consistency {a2,a1}
+  \<Longrightarrow> a1 \<noteq> a2
+  \<Longrightarrow> (balances_to_storage (transfer a1 a2 v1 ([a1\<mapsto>v1, a2\<mapsto>v2])) ** R) = (storage (balances_mapping a2) (v2 + v1) \<and>* storage (balances_mapping a1) 0 \<and>* R)"
+  apply (simp add: transfer_def balance_upd_def)
+  apply (sep_simp simp: balances_to_storage_sep)
+  apply simp
+  apply (sep_simp simp: balances_to_storage_sep)
+  apply (simp add: sep_conj_assoc sep_conj_commute)
+  apply (sep_simp simp: balances_to_storage_singleton)
+  apply (simp)+
+  done
 
 definition requires_cond
   where
