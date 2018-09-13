@@ -49,17 +49,16 @@ lemma program_sem_last_step_split :
   \<exists>x' k'. k' \<le> k \<and> program_sem st gc k' net (InstructionContinue x) = InstructionContinue x' \<and>
           next_state st gc net (InstructionContinue x') = InstructionToEnvironment z vctx retv"
   apply (induct k arbitrary: x)
-   apply(simp add: program_sem.simps)+
+   apply(simp)+
   apply(case_tac "next_state st gc net (InstructionContinue x)")
    apply clarsimp
    apply(drule meta_spec, drule meta_mp, assumption)
    apply clarsimp
    apply(rule_tac x=x' in exI)
-   apply(rule_tac x="Suc k'" in exI, simp add: program_sem.simps)
+   apply(rule_tac x="Suc k'" in exI, simp)
   apply clarsimp
   apply(rule_tac x=x in exI)
   apply(rule_tac x=0 in exI, simp add: program_sem_ItoE)
-  apply(simp add: program_sem.simps)
   done
 
 
@@ -107,7 +106,7 @@ lemma thirdComponentOfC_ge_0:
   apply (case_tac i ; simp add: gas_simps del: Cextra_def )
            apply (case_tac x2; simp add: gas_simps)
           apply (case_tac x3; simp add: gas_simps )
-         apply (case_tac x4 ; simp add: gas_simps)
+         apply (case_tac x4 ; simp add: gas_simps  del: log256floor.simps)
          using log256floor_ge_0[where s="uint s1"]
                  apply (simp add: )
               apply (clarsimp; simp add: word_less_def word_neq_0_conv)
@@ -116,9 +115,9 @@ lemma thirdComponentOfC_ge_0:
                 apply (case_tac "s2 = 0" ; auto simp: word_less_def word_neq_0_conv)
                 apply (case_tac "s2 = 0" ; auto simp: word_less_def word_neq_0_conv)
               apply (case_tac "s3 = 0" ; auto simp: word_less_def word_neq_0_conv)
-            apply (case_tac x8; simp add: gas_simps Csstore_def)
-            apply (case_tac x9; simp add: gas_simps Csstore_def)
-           apply (case_tac x10; simp add: gas_simps Csstore_def)
+            apply (case_tac x8; simp add: gas_simps)
+            apply (case_tac x9; simp add: gas_simps)
+           apply (case_tac x10; simp add: gas_simps)
           apply ( case_tac x12; case_tac "s1 = 0"; 
              simp add: gas_simps word_less_def word_neq_0_conv)
          apply (clarsimp split: misc_inst.splits)
@@ -141,7 +140,7 @@ done
 
 lemmas inst_sem_simps =
   instruction_failure_result_def stack_0_0_op_def  stack_0_1_op_def
-  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def subtract_gas.simps 
+  stack_2_1_op_def stack_3_1_op_def  stack_1_1_op_def 
   meter_gas_ge_0 sha3_def Let_def general_dup_def mload_def mstore_def
   mstore8_def calldatacopy_def codecopy_def extcodecopy_def  sstore_def
   jump_def jumpi_def strict_if_def blockedInstructionContinue_def
@@ -164,7 +163,7 @@ lemma instr_gas_le_vctx_gas:
   apply simp
   apply (rename_tac x)
   apply (drule_tac x="x" in spec)
-  apply (simp add: program_sem.simps next_state_def)
+  apply (simp add:  next_state_def)
   apply (simp add: instruction_sem_def)
   apply (case_tac inst ;clarsimp)
   apply ((rename_tac x, case_tac x; clarsimp),
@@ -286,15 +285,15 @@ uint (word_of_int
        < meter_gas (Misc CALL) x' gc net"
  
  apply (simp (no_asm) add: meter_gas_def Let_def C_def thirdComponentOfC_def
-            Ccall_def  Ccallgas_def )
-  apply (rule conjI; clarsimp simp: vctx_stack_default_def)+
-  apply (fold calc_memu_extra_def)
+            Ccall_def  Ccallgas_def del: )
+  apply (rule conjI; clarsimp simp: vctx_stack_default_def del: )+
+    apply (subst calc_memu_extra_def[simplified, symmetric, where ?s0.0="x21" and ?s1.0="x21a" and ?s2.0="0"])+
   apply (subst int_word_uint)
   apply (rule le_less_trans)
   apply (rule int_mod_le)
   apply (rule Cgascap_gt_0)
-  apply (subst add.commute)
-  apply (subst add.assoc, subst ordered_ab_semigroup_monoid_add_imp_le_class.less_add_same_cancel1)
+    apply (subst add.commute)
+    apply (subst add.assoc, subst ordered_ab_semigroup_monoid_add_imp_le_class.less_add_same_cancel1)
   apply (rule add_pos_nonneg[OF Cextra_gt_0 calc_memu_extra_ge_0])
 
   apply (subst add.commute)
@@ -303,31 +302,33 @@ uint (word_of_int
   apply (rule int_mod_le)
   apply simp
   apply (subst uint_nat)
-  apply (subst add.assoc, subst ordered_ab_semigroup_monoid_add_imp_le_class.less_add_same_cancel1)
+   apply (subst add.assoc, subst ordered_ab_semigroup_monoid_add_imp_le_class.less_add_same_cancel1)
+    apply (subst calc_memu_extra_def[simplified, symmetric, where ?s0.0="x21" and ?s1.0="x21a" and ?s2.0="0"])+
   apply (rule add_pos_nonneg[OF Cextra_gt_0 calc_memu_extra_ge_0])
 
    apply (rule conjI; clarsimp)
 
-    apply (subst add.commute[where a="calc_memu_extra _ _ _ _ _ _ _ _"])
   apply (subst int_word_uint)
   apply (rule le_less_trans)
   apply (rule int_mod_le)
 
   apply (rule add_increasing2)
    apply (simp add: Gcallstipend_def)
-  apply (rule Cgascap_gt_0)
-  apply (subst add.assoc, subst add_less_cancel_left)
+    apply (rule Cgascap_gt_0)
+   apply (subst calc_memu_extra_def[simplified, symmetric, where ?s0.0="x21" and ?s1.0="x21a" and ?s2.0="x21b"])+
+   apply (subst add.commute, subst add.assoc)
+   apply (subst add_less_cancel_left)
    apply (simp add: Gcallstipend_def gas_simps)
-  apply (rule conjI; clarsimp)
-  apply (rule add_pos_nonneg[OF _ calc_memu_extra_ge_0], simp)+
-  
+   apply (rule conjI; clarsimp)
+  apply (rule add_pos_nonneg[OF _ calc_memu_extra_ge_0], simp)+  
   apply (subst int_word_uint)
  apply (rule le_less_trans)
   apply (rule int_mod_le)
   apply (rule add_increasing2)
    apply (simp add: Gcallstipend_def)
- apply simp
-  apply (erule calc_memu_extra_gt_s0_stipend)
+   apply simp
+  using calc_memu_extra_gt_s0_stipend[simplified calc_memu_extra_def, where v=x21b]
+  apply simp
 done
 
 lemmas Ccallgas_le_meter_gas_call = order.strict_implies_order[OF Ccallgas_less_meter_gas_call]
