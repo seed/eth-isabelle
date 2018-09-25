@@ -396,7 +396,7 @@ lemma program_sem_t_ContractCall_gas :
   apply(drule sym, erule program_sem_ContractCall_gas)
   done
 
-definition global_gas  :: " global0 \<Rightarrow> nat "  where                  
+definition global_gas  :: "eth_global \<Rightarrow> nat " where
  "global_gas g = nat (get_vctx_gas g) + sum_list (map (\<lambda>(_,vctx,_). nat (vctx_gas vctx)) (g_stack g))"
 
 lemma stop_gas:
@@ -756,4 +756,5 @@ termination global_sem
   apply fastforce
  done
 
+term global_sem
 end

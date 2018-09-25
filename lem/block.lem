@@ -288,7 +288,7 @@ type stack_hint =
  | CreateAddress of address
  | ReturnTo of integer * integer
 
-type global = <|
+type eth_global = <|
   g_orig : world_state;
   g_stack : list (world_state * variable_ctx * constant_ctx * stack_hint);
   g_current : world_state;
@@ -308,7 +308,7 @@ type tr_result = <|
 
 type global_state =
  | Unimplemented
- | Continue of global
+ | Continue of eth_global
  | Finished of tr_result
 
 let get_hint = function
@@ -492,7 +492,7 @@ let step net = function
     end
 end
 
-val envstep: network -> global -> global_state
+val envstep: network -> eth_global -> global_state
 let envstep net global =
     let orig = global.g_orig in
     let c = global.g_cctx in
@@ -623,23 +623,23 @@ let envstep net global =
     end
 
 
-val get_vctx_gas: global -> integer
+val get_vctx_gas: eth_global -> integer
 let get_vctx_gas g =
   match g.g_vmstate with
   | InstructionContinue v -> v.vctx_gas
   | InstructionToEnvironment _ v _ -> v.vctx_gas
   end
 
-val get_callstack_length: global -> nat
+val get_callstack_length: eth_global -> nat
 let get_callstack_length g = List.length (g.g_stack)
 
-val global_step: network -> global -> global_state
+val global_step: network -> eth_global -> global_state
 let global_step net g =
   let ir = program_sem_t g.g_cctx net g.g_vmstate in
   let g' = <| g with g_vmstate = ir |> in
   envstep net g'
 
-val global_sem: network -> global -> maybe tr_result
+val global_sem: network -> eth_global -> maybe tr_result
 let rec global_sem net g =
   if get_vctx_gas g <= 0 then
       Nothing
