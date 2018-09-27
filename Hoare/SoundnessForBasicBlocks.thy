@@ -20,6 +20,8 @@ imports "HoareTripleForBasicBlocks"
 "../Word_Lib/Word_Lemmas"
 begin
 
+declare new_memory_consumption.simps[simp del]
+
 lemmas instruction_simps =
 instruction_sem_simps gas_value_simps
 inst_size_simps inst_numbers_simps
@@ -49,6 +51,8 @@ done
 lemma inst_false_pre_sem:
   "triple_inst_sem n \<langle>False\<rangle> i q"
 by(simp add: triple_inst_sem_def sep_basic_simps pure_def)
+
+declare program_sem.simps[simp del]
 
 method inst_sound_set_eq uses simp =
  simp add: triple_inst_sem_def program_sem.simps as_set_simps,
@@ -967,6 +971,8 @@ lemma inst_log_sound:
 lemma triple_inst_soundness:
 notes
   if_split[split del]
+  word_exp.simps[simp del]
+  log256floor.simps[simp del]
 shows
   "triple_inst net p i q \<Longrightarrow> triple_inst_sem net p i q"
   apply(induction rule:triple_inst.induct)
@@ -990,9 +996,9 @@ shows
               apply(inst_sound_set_eq, set_solve)
                apply(inst_sound_set_eq simp: iszero_stack_def, set_solve)
 (* Arith EXP *)
-            apply(split if_split, rule conjI, rule impI)
-               apply(inst_sound_set_eq simp: word_exp.simps, set_solve)
-              apply(inst_sound_set_eq simp: word_exp_eq_pow_mod, set_solve)
+                apply(split if_split, rule conjI, rule impI)
+                apply(inst_sound_set_eq simp: word_exp.simps, set_solve)
+                apply(inst_sound_set_eq simp: word_exp_eq_pow_mod word_exp.simps, set_solve)
               apply -
 (* Arith SHA3 *)
   apply (rule inst_arith_sha3_sem)
@@ -1655,6 +1661,8 @@ lemma program_counter_first:
 lemma pc_after_inst:
 notes
   if_split[split del]
+  word_exp.simps [simp del]
+  log256floor.simps [simp del]
 shows
 "triple_inst net pre x post \<Longrightarrow> x = (n, i) \<Longrightarrow> reg_inst i \<Longrightarrow>
 \<exists>s. pre s \<and> uniq_stateelm s \<Longrightarrow>
