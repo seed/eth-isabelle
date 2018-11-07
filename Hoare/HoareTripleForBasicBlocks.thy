@@ -607,8 +607,8 @@ inductive triple_blocks :: "network \<Rightarrow> basic_blocks \<Rightarrow> pre
   "triple_blocks net blocks p f q \<Longrightarrow>
    (\<And>s. r s \<Longrightarrow> p s) \<Longrightarrow>
    triple_blocks net blocks r f q"
-definition triple :: "network \<Rightarrow> pred \<Rightarrow> basic_blocks \<Rightarrow> pred \<Rightarrow> bool" where
-"triple net pre blocks post = triple_blocks net blocks pre (hd blocks) post"
+definition bbtriple :: "network \<Rightarrow> pred \<Rightarrow> basic_blocks \<Rightarrow> pred \<Rightarrow> bool" where
+"bbtriple net pre blocks post = triple_blocks net blocks pre (hd blocks) post"
 
 lemma blocks_next_ex:
   "\<lbrakk>triple_seq net pre insts (program_counter i \<and>* q);

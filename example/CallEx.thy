@@ -49,6 +49,49 @@ definition B_addr :: "address" where
 definition B_bytestr :: "byte list" where
  "B_bytestr \<equiv> bytes_of_hex_content ''6080604052348015600f57600080fd5b5060a18061001e6000396000f300608060405260043610603f576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff16806326121ff0146044575b600080fd5b348015604f57600080fd5b506056606c565b6040518082815260200191505060405180910390f35b6000602a9050905600a165627a7a7230582056366c316c8eb1c2cb71b875b90a5eaf72d3069879bea637993dcf928cfb1cde0029''"
 
+
+value "parse_bytes A_bytestr"
+
+definition
+ "A_insts \<equiv> [Stack (PUSH_N [0x80]), Stack (PUSH_N [0x40]), Memory MSTORE, Info CALLVALUE, Dup 0, Arith ISZERO, Stack (PUSH_N [0, 0x10]), Pc JUMPI,
+  Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Stack POP, Stack (PUSH_N [0x40]), Memory MLOAD, Stack (PUSH_N [0x20]), Dup 0,
+  Stack (PUSH_N [1, 0xF3]), Dup 3, Memory CODECOPY, Dup 1, Arith ADD, Dup 0, Stack (PUSH_N [0x40]), Memory MSTORE, Dup 1, Arith ADD,
+  Swap 0, Dup 0, Dup 0, Memory MLOAD, Swap 0, Stack (PUSH_N [0x20]), Arith ADD, Swap 0, Swap 2, Swap 1, Swap 0, Stack POP, Stack POP,
+  Stack POP, Dup 0, Stack (PUSH_N [0]), Dup 0, Stack (PUSH_N [1, 0]), Arith EXP, Dup 1, Storage SLOAD, Dup 1,
+  Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
+  Arith MUL, Bits inst_NOT, Bits inst_AND, Swap 0, Dup 3,
+  Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
+  Bits inst_AND, Arith MUL, Bits inst_OR, Swap 0, Storage SSTORE, Stack POP, Stack (PUSH_N [0]), Stack (PUSH_N [1]), Dup 1, Swap 0,
+  Storage SSTORE, Stack POP, Stack POP, Stack (PUSH_N [1, 0x68]), Dup 0, Stack (PUSH_N [0, 0x8B]), Stack (PUSH_N [0]), Memory CODECOPY,
+  Stack (PUSH_N [0]), Misc RETURN, Misc STOP, Stack (PUSH_N [0x80]), Stack (PUSH_N [0x40]), Memory MSTORE, Stack (PUSH_N [4]),
+  Info CALLDATASIZE, Arith inst_LT, Stack (PUSH_N [0, 0x41]), Pc JUMPI, Stack (PUSH_N [0]), Stack CALLDATALOAD,
+  Stack (PUSH_N [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), Swap 0, Arith DIV,
+  Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF]), Bits inst_AND, Dup 0, Stack (PUSH_N [0x44, 0xFD, 0x4F, 0xA0]), Arith inst_EQ,
+  Stack (PUSH_N [0, 0x46]), Pc JUMPI, Pc JUMPDEST, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Info CALLVALUE, Dup 0,
+  Arith ISZERO, Stack (PUSH_N [0, 0x52]), Pc JUMPI, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Stack POP,
+  Stack (PUSH_N [0, 0x5B]), Stack (PUSH_N [0, 0x71]), Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Dup 2, Dup 1,
+  Memory MSTORE, Stack (PUSH_N [0x20]), Arith ADD, Swap 1, Stack POP, Stack POP, Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Swap 1,
+  Arith SUB, Swap 0, Misc RETURN, Pc JUMPDEST, Stack (PUSH_N [0]), Dup 0, Stack (PUSH_N [0]), Swap 0, Storage SLOAD, Swap 0,
+  Stack (PUSH_N [1, 0]), Arith EXP, Swap 0, Arith DIV,
+  Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
+  Bits inst_AND,
+  Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
+  Bits inst_AND, Stack (PUSH_N [0x26, 0x12, 0x1F, 0xF0]), Stack (PUSH_N [0x40]), Memory MLOAD, Dup 1,
+  Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF]), Bits inst_AND,
+  Stack (PUSH_N [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), Arith MUL, Dup 1, Memory MSTORE,
+  Stack (PUSH_N [4]), Arith ADD, Stack (PUSH_N [0x20]), Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Dup 3, Arith SUB, Dup 1,
+  Stack (PUSH_N [0]), Dup 7, Dup 0, Info EXTCODESIZE, Arith ISZERO, Dup 0, Arith ISZERO, Stack (PUSH_N [0, 0xF8]), Pc JUMPI,
+  Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Stack POP, Info GAS, Misc CALL, Arith ISZERO, Dup 0, Arith ISZERO,
+  Stack (PUSH_N [1, 0xC]), Pc JUMPI, Unknown 0x3D, Stack (PUSH_N [0]), Dup 0, Unknown 0x3E, Unknown 0x3D, Stack (PUSH_N [0]), Unknown 0xFD,
+  Pc JUMPDEST, Stack POP, Stack POP, Stack POP, Stack POP, Stack (PUSH_N [0x40]), Memory MLOAD, Unknown 0x3D, Stack (PUSH_N [0x20]), Dup 1,
+  Arith inst_LT, Arith ISZERO, Stack (PUSH_N [1, 0x22]), Pc JUMPI, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Dup 1, Arith ADD,
+  Swap 0, Dup 0, Dup 0, Memory MLOAD, Swap 0, Stack (PUSH_N [0x20]), Arith ADD, Swap 0, Swap 2, Swap 1, Swap 0, Stack POP, Stack POP,
+  Stack POP, Stack (PUSH_N [1]), Dup 1, Swap 0, Storage SSTORE, Stack POP, Swap 0, Pc JUMP, Misc STOP, Log LOG1,
+  Stack (PUSH_N [0x62, 0x7A, 0x7A, 0x72, 0x30, 0x58]), Arith SHA3, Unknown 0xB0, Swap 8, Unknown 0xD6, Dup 4, Unknown 0xBC, Unknown 0x25,
+  Bits inst_AND, Log LOG3, Unknown 0xAF, Memory MLOAD, Arith MOD, Unknown 0xF6, Unknown 0xEF, Unknown 0xD3, Dup 0xD, Swap 2,
+  Stack (PUSH_N [0xDB, 0x67, 0xEA, 0x42, 0xC0, 0x65, 0xBD, 0x94, 0xA6, 0x3E, 0x7E, 0x98, 0x8F, 0x19, 0x98]), Misc STOP, Unknown 0x29]"
+
+
 definition
   bytestr_to_program :: "byte list \<Rightarrow> program" where
  "bytestr_to_program bytestr \<equiv> program_of_lst (parse_bytes bytestr)
@@ -207,8 +250,62 @@ lemma
        InstructionToEnvironment x21 x22 x23"
   oops
 
+lemma A_bytestr_sz:
+ "fst (last (add_address A_insts)) < 2 ^ 256"
+  by eval
+
+theorem triple_soundness:
+"bytecode \<noteq> [] \<Longrightarrow>
+fst (last (add_address bytecode)) < 2 ^ 256 \<Longrightarrow>
+bbtriple net pre (build_blocks bytecode) post \<Longrightarrow>
+triple_sem_t net pre (set (add_address bytecode)) post"
+  sorry
+
+lemma parse_bytes_not_Nil:
+ "xs \<noteq> [] \<Longrightarrow> parse_bytes xs \<noteq> []"
+  by (case_tac xs; clarsimp split: parse_byte_result.splits)
+
+lemma bytes_of_hex_content_not_Nil:
+"length xs > 1 \<Longrightarrow>
+ bytes_of_hex_content xs \<noteq> []"
+  apply (case_tac xs; clarsimp)
+  apply (rename_tac ys, case_tac ys; clarsimp)
+  done
+
+definition bytestr :: "'a::len0 word \<Rightarrow> byte list"  where
+ "bytestr \<equiv> word_rsplit"
+
+abbreviation "blk_num \<equiv> block_number_pred"
+
+definition
+  bytestr_to_w256 :: "byte list \<Rightarrow> w256"  where
+ "bytestr_to_w256 \<equiv> word_rcat"
+
+
+lemma
+ "bbtriple net
+ ( program_counter 0 ** stack_height 0 **
+   sent_data (bytestr A_hash) **
+   sent_value 0 ** caller sender ** blk_num bn **
+   memory_usage 0 ** continuing ** gas_pred 100000 **
+   storage 0 B_ptr **
+   storage 1 v **
+   account_existence sender sender_ex  **
+   account_existence to to_ex **
+   memory (0::w256) m0x0 **
+   memory (0x20::w256) m0x20 **
+   memory (0x40::w256) (bytestr_to_w256 [x]) **
+   memory (0x60::w256) (bytestr_to_w256 [y]) **
+   log_number log_num **
+   this_account this)
+ (build_blocks A_insts) Q"
+  oops
+
 lemma A_calls_B_spec:
- "triple_sem_t net P (undefined A_bytestr) Q"
+  " triple_sem_t net P (set (add_address (A_insts))) Q"
+  apply (rule triple_soundness)
+   apply (simp add: A_insts_def)
+  apply (simp only: A_bytestr_sz)
   sorry
 
 lemma
@@ -235,7 +332,8 @@ lemma
     apply (clarsimp simp: tr_gas_limit'_def calc_igas_def bi_def homestead_block_def)
   apply (clarsimp simp add: program_sem_t_no_gas_not_continuing split: instruction_result.splits)
   apply (clarsimp simp: program_sem_t.simps vctx_next_instruction_def)
-  using A_calls_B_spec[simplified]
+  using A_calls_B_spec[simplified triple_sem_t_def]
+  
     apply (case_tac "global_step net _ ")
   oops
 
