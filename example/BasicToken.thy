@@ -304,7 +304,6 @@ evm_fun_simps[simp add] sep_lc[simp del] sep_conj_first[simp add]
 pure_false_simps[simp add] iszero_stack_def[simp add]
 word256FromNat_def[simp add]
 begin
-abbreviation "blk_num \<equiv> block_number_pred"
 
 lemma address_mask:
  "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF = mask 160"
@@ -435,257 +434,6 @@ definition requires_cond
  "requires_cond to val balance_frm balance_to \<equiv>
   to \<noteq> 0 \<and>  val \<le> balance_frm"
 
-lemma len_bytestr_simps: 
- "\<And>x. length (bytestr (x::32 word)) = 4"
- "\<And>x. length (bytestr (x::64 word)) = 8"
- "\<And>x. length (bytestr (x::256 word)) = 32"
-  by(simp add: bytestr_def length_word_rsplit_exp_size' word_size)+
-
-lemma two_power_of_224:
- "(0x100000000000000000000000000000000000000000000000000000000::nat) = 2^224"
-  by simp
-
-
-(* *** word_rcat shifts more generally *** *)
-lemma concat_map_take :
-"\<forall>x \<in> set xs. length (f x) = n \<Longrightarrow>
-List.concat (map f (take k xs)) = take (k*n) (List.concat (map f xs))"
-  apply(induct xs arbitrary: k, simp)
-  apply(case_tac k, simp)
-  apply clarsimp
-  done
-
-
-lemma word_rcat_shiftr_take : 
-"length ys = 32 \<Longrightarrow> k \<le> 32 \<Longrightarrow>
- word_rcat (ys::byte list) >> 8 * k = (word_rcat (take (length ys - k) ys) ::w256)"
-  apply (simp add: word_rcat_bl shiftr_bl)
-  apply (simp add: word_rep_drop size_rcat_lem)
-  apply(subst concat_map_take[where n=8])
-   apply clarsimp
-  apply(subst diff_mult_distrib)
-  apply simp
-  apply(subst Groups.ab_semigroup_mult_class.mult.commute)
-  by(rule refl)
-
-lemma word_rcat_append_shiftr :
-  "length ys + length xs = 32 \<Longrightarrow>
-   word_rcat ((ys::byte list) @ xs) >> (8 * length xs) = (word_rcat ys :: w256)"
-  by(subst word_rcat_shiftr_take, simp_all)
-(* ************************************************ *)  
-
-lemma take_32_of_w256:
-  fixes w1::byte and w2 :: byte and w3 :: byte and w4 :: byte and xs :: "bool list"
-  shows
- "length xs = 224 \<Longrightarrow> 
-  take 32 (to_bl (of_bl (to_bl w1 @ to_bl w2 @ to_bl w3 @ to_bl w4 @ xs) :: 256 word)) =
-   take 32 (to_bl w1 @ to_bl w2 @ to_bl w3 @ to_bl w4)"
-  by (simp add: word_rep_drop)
-
-lemma word_rcat_div_rep0:
-  "length xs = 28 \<Longrightarrow>
-  (word_rcat ([a::byte, b, d, e] @ xs)::w256) div (0x100000000000000000000000000000000000000000000000000000000::w256) =
-   word_rcat [a, b, d, e]"
-  apply (subst word_unat.Rep_inject [symmetric])
-  apply (subst unat_div)
-  apply (simp add: )
-  apply (subst two_power_of_224)
-  apply (subst shiftr_div_2n'[symmetric])
-  apply(subgoal_tac "unat (word_rcat (a # b # d # e # xs) >> 224) = 
-                     unat (word_rcat ([a, b, d, e] @ xs) >> 8 * length xs)")
-   apply(erule ssubst, subst word_rcat_append_shiftr)
-    apply simp
-   apply(rule refl)
-  by simp
-
-lemma word_rcat_word_rsplit_div_rep0:
-  "length xs = 28 \<Longrightarrow>
-  (word_rcat (word_rsplit (w::32 word) @ (xs::byte list))::w256) div (0x100000000000000000000000000000000000000000000000000000000::w256) =
-   word_rcat (word_rsplit w :: byte list)"
-  apply (subst word_unat.Rep_inject [symmetric])
-  apply (subst unat_div)
-  apply (simp add: )
-  apply (subst two_power_of_224)
-  apply (subst shiftr_div_2n'[symmetric])
-  apply(subgoal_tac "unat (word_rcat (word_rsplit w @ xs) >> 224) = 
-                     unat (word_rcat (word_rsplit w @ xs) >> 8 * length xs)")
-   apply(erule ssubst, subst word_rcat_append_shiftr)
-    apply(simp add: length_word_rsplit_4)
-   apply(rule refl)
-  by simp
-
-(* ? ? ? ?
-lemma take_to_bl_of_bl_word_list:
-  fixes w::"'b::len0 word"
-    and w'::"'a::len0 word"
-    and xs :: "bool list"
-  shows
- "length xs = LENGTH('b) - LENGTH('a) \<Longrightarrow>
-  w = of_bl (to_bl w' @ xs) \<Longrightarrow>
-  LENGTH('b) > LENGTH('a) \<Longrightarrow>
-  take LENGTH('a) (to_bl w) =
-   take LENGTH('a) (to_bl w')"
-  by (simp add: word_rep_drop)
-
-lemma take_32_concat_to_bl_word_rsplit:
-  fixes w :: "32 word"
-  and xs :: "byte list"
-  shows
-  "length xs = 28 \<Longrightarrow>
-    take 32 (to_bl (of_bl (List.concat (map to_bl (word_rsplit w :: byte list)) @ List.concat (map to_bl xs)):: w256)) =
-    List.concat (map to_bl (word_rsplit w :: byte list))"
-  by (simp add:word_rev_tf takefill_alt size_rcat_lem length_word_rsplit_4)
-
-lemma word_rcat_word_rsplit_div_rep0:
-  "length xs = 28 \<Longrightarrow>
-  (word_rcat (word_rsplit (w::32 word) @ (xs::byte list))::w256) div (0x100000000000000000000000000000000000000000000000000000000::w256) =
-   word_rcat (word_rsplit w :: byte list)"
-  apply (subst word_unat.Rep_inject [symmetric])
-  apply (subst unat_div)
-  apply (simp add: )
-  apply (subst two_power_of_224)
-  apply (subst shiftr_div_2n'[symmetric])
-  apply (simp add: word_rcat_bl shiftr_bl)
-  apply (rule arg_cong[where f=of_bl])
-  apply (simp add: take_32_concat_to_bl_word_rsplit)
-  done
-*)
-
-
-lemma w256_mask_32:
-  "(0xFFFFFFFF::w256) = mask 32"
-  by (simp add: mask_def)
-
-lemma unat_ucast:
-  assumes "LENGTH('a) \<le> LENGTH('b)"
-  shows "unat (UCAST ('a::len0\<rightarrow>'b::len) x) = unat x"
-  unfolding ucast_def unat_def
-  apply (subst int_word_uint)
-  apply (subst mod_pos_pos_trivial)
-    apply simp
-   apply (rule lt2p_lem)
-  apply (rule assms)
-   apply simp
-  done
-
-lemma ucast_le_ucast:
-  "LENGTH('a) \<le> LENGTH('b) \<Longrightarrow> (UCAST('a::len0\<rightarrow>'b::len) x \<le> (ucast y)) = (x \<le> y)"
-  by (simp add: word_le_nat_alt unat_ucast)
-
-lemma minus_1_w32:
-  " (-1::32 word) = 0xffffffff"
-  by simp
-
-lemma ucast_32_256_minus_1_eq:
-  "UCAST(32 \<rightarrow> 256) (- 1) = 0xFFFFFFFF"
-  apply (simp add: ucast_def unat_arith_simps unat_def)
-  apply (subst int_word_uint)
-  apply (subst mod_pos_pos_trivial)
-    apply simp
-   apply (clarsimp split: uint_splits)
-  apply (simp add: minus_1_w32)
-  done
-
-lemma ucast_frm_32_le_mask_32:
- "UCAST(32\<rightarrow>256) z \<le> mask 32"
-  apply (subgoal_tac "mask 32 = UCAST(32\<rightarrow>256) (mask 32)")
-   apply (simp add: ucast_le_ucast mask_32_max_word)
-  apply (simp add: mask_def)
-  apply (simp add: ucast_32_256_minus_1_eq)
-  done
-
-lemma dispatcher_hash_extract:
- "length xs = 28 \<Longrightarrow>
-  0xFFFFFFFF && word_of_int (uint (word_rcat (bytestr (z::32 word) @ xs) :: w256) div
-      0x100000000000000000000000000000000000000000000000000000000) =
-    (word_rcat (bytestr z)::w256)"
-  apply (simp add: bytestr_def)
-  apply(rule subst[where P="\<lambda>x. _ AND word_of_int x = _"])
-  apply (rule uint_div[where x="word_rcat (word_rsplit z @ xs)"
-        and y="0x100000000000000000000000000000000000000000000000000000000::w256", simplified])
-  apply (subst word_rcat_word_rsplit_div_rep0; simp)
-  apply (simp add: w256_mask_32)
-  apply (subst word_bw_comms(1))
-  apply (simp add: and_mask_eq_iff_le_mask)
-  apply (simp add: word_rcat_rsplit_ucast)
-  apply (simp add: ucast_frm_32_le_mask_32)
-  done
-
-lemma word_rsplit_byte_split:
-"(word_rsplit (w1::w256) :: byte list) =
-       a # aa # ab # ac # ad # ae # af # ag # ah # ai # aj #
- ak # al # am # an # ao # ap # aq # ar # as # a't # au # av #
- aw # ax # ay # az # ba # bb # bc # bd # be # lisue  \<Longrightarrow> lisue = []"
-  using length_word_rsplit_32[where x=w1]
-  by simp
-
-lemma memory_range_0_w256_append:
-  "(memory_range 0 (word_rsplit (w1::w256)) \<and>* memory_range 0x20  (word_rsplit (w2::w256))) =
-     memory_range 0 (word_rsplit w1 @ word_rsplit w2)"
-  apply (rule ext)
-  apply (case_tac "(word_rsplit w1 :: byte list)")
-   apply (simp add: length_0_conv[symmetric])
-  apply (rename_tac list , case_tac list, solves \<open>simp add: list_eq_iff_zip_eq[where xs="word_rsplit _"]\<close>)+
-  apply (simp add:)
-  apply (drule word_rsplit_byte_split)
-  apply simp
-  apply (thin_tac " _ = _ ")+
-  apply (rename_tac list)
-  apply (simp add: memory_range.simps)  
-  done
-
-lemma two_memory_memory_range_eq:
- "(R' \<and>* memory 0x20 w2 \<and>* R  \<and>* memory 0 w1  \<and>* R'') = (memory_range 0 (word_rsplit w1 @ word_rsplit w2) \<and>* R' \<and>* R  \<and>* R'')"
-  by (simp add: memory_def, simp add: ac_simps, sep_simp simp: memory_range_0_w256_append)
-
-lemma  stack_topmost_unfold_sep:
-  "(stack_topmost h [a, b, c, d, e] ** R)
-  = (stack_height (Suc (Suc (Suc (Suc (Suc h))))) ** stack h a ** stack (Suc h) b  ** stack (Suc (Suc h)) c** stack (Suc (Suc (Suc h))) d  
-  ** stack (Suc (Suc (Suc (Suc h)))) e ** R)"
-  apply (unfold stack_topmost_def)
-  apply clarsimp
-  apply (rule ext)
-  apply (rule iffI)
-  apply (clarsimp simp add: sep_basic_simps stack_def stack_height_def )
-  apply (rule_tac x="insert (StackElm (Suc (Suc (Suc (Suc h))), e))
-                 (insert (StackElm (Suc (Suc (Suc h)), d))
-                   (insert (StackElm (Suc (Suc h), c))
-                     (insert (StackElm (Suc h, b)) (insert (StackElm (h, a)) y))))" in exI)
-  apply clarsimp
-  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e), StackElm (Suc (Suc (Suc h)), d),
-                      StackElm (Suc (Suc h), c), StackElm (Suc h, b)} \<union> y" in exI)
-   apply clarsimp
-   apply (rule conjI)
-    apply blast
-  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e), StackElm (Suc (Suc (Suc h)), d),
-                      StackElm (Suc (Suc h), c)} \<union> y" in exI)
-   apply clarsimp
-   apply (rule conjI)
-    apply blast
-  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e), StackElm (Suc (Suc (Suc h)), d) } \<union> y" in exI)
-   apply clarsimp
-  
-   apply (rule conjI)
-    apply blast
-  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e) } \<union> y" in exI)
- 
-   apply clarsimp
-   apply blast  
-  apply (clarsimp simp add: sep_basic_simps stack_def stack_height_def )
-  apply (drule_tac x=ye in spec)
-  apply blast
-  done
-
-lemma sep_stack_topmost_unfold_sep:
-  "(R' ** stack_topmost h [a, b, c, d, e] ** R)
-  = (R' ** stack_height (Suc (Suc (Suc (Suc (Suc h))))) ** stack h a ** stack (Suc h) b  ** stack (Suc (Suc h)) c** stack (Suc (Suc (Suc h))) d  
-  ** stack (Suc (Suc (Suc (Suc h)))) e ** R)"
-  by (sep_simp simp: stack_topmost_unfold_sep)
-
-lemma memory_range_last:
- "unat (len::w256) = length data \<Longrightarrow> 
-  (a \<and>* memory_range st data \<and>* b) = (a \<and>* b \<and>*  memory_range st data)"
- by (sep_simp simp: memory_range_sep)+
 
 method fast_sep_imp_solve uses simp = 
   (match conclusion  in "triple_blocks _ _ _ _ _"  \<Rightarrow> \<open>succeed\<close> | 
@@ -712,7 +460,7 @@ len_bytestr_simps[simp]
 assumes blk_num: "bn > 2463000"
 and net: "at_least_eip150 net"
 shows
-"\<exists>r. triple net
+"\<exists>r. bbtriple net
   (\<langle>balances_mapping anyaddr \<noteq> balances_mapping sender \<and>
     balances_mapping anyaddr \<noteq> balances_mapping to \<and> at_least_eip150 net \<rangle> **
    program_counter 0 ** stack_height 0 **
@@ -744,7 +492,7 @@ shows
   apply (insert blk_num[simplified word_less_nat_alt] net)
   apply (simp add: Let_def)
   apply (simp add:blocks_basictoken_simp)
-  apply(simp add: blocks_simps triple_def )
+  apply(simp add: blocks_simps bbtriple_def )
   apply (triple_blocks_vcg)
   apply (sep_imp_solve2)
   apply (sep_imp_solve2)
