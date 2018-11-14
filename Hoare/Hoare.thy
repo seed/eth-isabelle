@@ -280,6 +280,10 @@ definition logged :: "nat \<Rightarrow> log_entry \<Rightarrow> state_element se
 where
 "logged n l s == s = {LogElm (n, l)}"
 
+definition ext_program_size :: "address \<Rightarrow> int \<Rightarrow> state_element set \<Rightarrow> bool"
+where
+  "ext_program_size addr sz s \<equiv> s = {ExtProgramSizeElm (addr, sz)}"
+
 definition account_existence :: "address \<Rightarrow> bool \<Rightarrow> state_element set \<Rightarrow> bool"
 where
 "account_existence a b s == s = {AccountExistenceElm (a, b)}"
@@ -705,8 +709,7 @@ done
 (* Maybe it's better to organize program_sem as a function from program_result to program_result *)
 lemma triple_continue:
 "triple net allowed q c r \<Longrightarrow>
- no_assertion co_ctx \<Longrightarrow>
- (q ** code c ** rest) (instruction_result_as_set co_ctx (program_sem s co_ctx k net presult)) \<Longrightarrow>
+  (q ** code c ** rest) (instruction_result_as_set co_ctx (program_sem s co_ctx k net presult)) \<Longrightarrow>
  \<exists> l. ((r ** code c ** rest) (instruction_result_as_set co_ctx (program_sem s co_ctx (k + l) net presult))
       \<or> failed_for_reasons allowed (program_sem s co_ctx (k + l) net presult))"
 apply(simp add: triple_def)

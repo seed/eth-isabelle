@@ -84,6 +84,24 @@ definition
   Bits inst_AND, Log LOG3, Unknown 0xAF, Memory MLOAD, Arith MOD, Unknown 0xF6, Unknown 0xEF, Unknown 0xD3, Dup 0xD, Swap 2,
   Stack (PUSH_N [0xDB, 0x67, 0xEA, 0x42, 0xC0, 0x65, 0xBD, 0x94, 0xA6, 0x3E, 0x7E, 0x98, 0x8F, 0x19, 0x98]), Misc STOP, Unknown 0x29]"
 
+value "parse_bytes B_bytestr"
+definition
+ "B_insts \<equiv> [Stack (PUSH_N [0x80]), Stack (PUSH_N [0x40]), Memory MSTORE, Stack (PUSH_N [4]), Info CALLDATASIZE,
+  Arith inst_LT, Stack (PUSH_N [0x3F]), Pc JUMPI, Stack (PUSH_N [0]), Stack CALLDATALOAD,
+  Stack (PUSH_N [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+  Swap 0, Arith DIV, Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF]), Bits inst_AND, Dup 0,
+  Stack (PUSH_N [0x26, 0x12, 0x1F, 0xF0]), Arith inst_EQ, Stack (PUSH_N [0x44]), Pc JUMPI, Pc JUMPDEST,
+  Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Info CALLVALUE, Dup 0, Arith ISZERO,
+  Stack (PUSH_N [0x4F]), Pc JUMPI, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Stack POP,
+  Stack (PUSH_N [0x56]), Stack (PUSH_N [0x6C]), Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0x40]), Memory MLOAD,
+  Dup 0, Dup 2, Dup 1, Memory MSTORE, Stack (PUSH_N [0x20]), Arith ADD, Swap 1, Stack POP, Stack POP,
+  Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Swap 1, Arith SUB, Swap 0, Misc RETURN, Pc JUMPDEST,
+  Stack (PUSH_N [0]), Stack (PUSH_N [0x2A]), Swap 0, Stack POP, Swap 0, Pc JUMP, Misc STOP, Log LOG1,
+  Stack (PUSH_N [0x62, 0x7A, 0x7A, 0x72, 0x30, 0x58]), Arith SHA3, Pc JUMP, Info CALLDATASIZE,
+  Stack (PUSH_N [0x31, 0x6C, 0x8E, 0xB1, 0xC2, 0xCB, 0x71, 0xB8, 0x75, 0xB9, 0xA, 0x5E, 0xAF]),
+  Stack
+   (PUSH_N
+     [0xD3, 6, 0x98, 0x79, 0xBE, 0xA6, 0x37, 0x99, 0x3D, 0xCF, 0x92, 0x8C, 0xFB, 0x1C, 0xDE, 0, 0x29, 0])]"
 
 definition
   bytestr_to_program :: "byte list \<Rightarrow> program" where
@@ -341,134 +359,121 @@ lemma blocks_A_insts_simp:
 definition A_hash :: "32 word" where
  "A_hash \<equiv> 0x44fd4fa0"
 
+lemma ucast_A_hash:
+ "UCAST(32 \<rightarrow> 256) A_hash = 0x44FD4FA0"
+  by (simp add: A_hash_def)
+
+method sep_conj_destroy methods m uses simp =
+  clarsimp?,
+  (rule conjI; (clarsimp simp: simp | m)) | m
+
+definition
+  "eip150_block \<equiv> 2463*1000"
+
+lemma m_and_a_and_m_simp:
+ "(m::'a::len word) && a && m = a && m"
+  by ( subst boolean.conj_commute[OF word_boolean], simp)
+
+lemma ucast_160_cancels_mask[simp]:
+ "UCAST(256 \<rightarrow> 160) (addr && 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) = UCAST(256 \<rightarrow> 160) addr"
+  by(simp add: address_mask ucast_mask_drop)
+
 lemma
-  bit_mask_rev[simp]
-  address_mask_ucast[simp] address_mask_ucast[simplified word_bool_alg.conj.commute, simp]
+  notes
+  address_mask_ucast[simp]
+  address_mask_ucast[simplified word_bool_alg.conj.commute, simp]
   ucast_and_w256_drop[simp]
-  transfer_hash_def[simp]
   word_bool_alg.conj.commute[simp]
   length_word_rsplit_4[simp]
   ucast_160_upto_256_eq[simp]
   hash_diff[simp]
   eval_bit_mask[simp]
-len_bytestr_simps[simp]
+  len_bytestr_simps[simp]
 shows
-
- "\<exists>Q. bbtriple net
- ( program_counter 0 ** stack_height 0 **
-   sent_data (bytestr A_hash) **
-   sent_value 0 ** caller sender ** blk_num bn **
-   memory_usage 0 ** continuing ** gas_pred 100000 **
-   storage 0 B_ptr **
-   storage 1 v **
-   account_existence sender sender_ex  **
-   account_existence to to_ex **
-   memory (0::w256) m0x0 **
-   memory (0x20::w256) m0x20 **
-   memory (0x40::w256) (bytestr_to_w256 [x]) **
-   memory (0x60::w256) (bytestr_to_w256 [y]) **
-   log_number log_num **
-   this_account this)
- (blocks_A_insts) (action (ContractCall args) ** Q)"
+ "unat bn > eip150_block
+ \<Longrightarrow> at_least_eip150 net
+ \<Longrightarrow> \<exists>Q. bbtriple net
+   ( program_counter 0 ** stack_height 0 **
+     sent_data (bytestr A_hash) **
+     sent_value 0 ** caller sender ** blk_num bn **
+     memory_usage 0 ** continuing ** gas_pred 100000 **
+     storage 0 B_ptr **
+     storage 1 v **
+     account_existence sender sender_ex  **
+     account_existence to to_ex **
+     memory (0::w256) m0x0 **
+     memory (0x20::w256) m0x20 **
+     memory (0x40::w256) (bytestr_to_w256 [x]) **
+     memory (0x60::w256) (bytestr_to_w256 [y]) **
+     memory (0x80::w256) m0x80 **
+     log_number log_num **
+     this_account this **
+      ext_program_size (UCAST(256 \<rightarrow> 160) B_ptr) (length B_insts))
+   (blocks_A_insts) (action (ContractCall args) ** Q)"
   including dispatcher_bundle
   apply (rule exI)
   apply (simp add: blocks_A_insts_simp)
   apply (simp add: bbtriple_def )
   apply (block_vcg; (solves \<open>clarsimp\<close>)?)
    apply (block_vcg)
-  apply (simp add: bytestr_def length_word_rsplit_32)
-   apply (simp add: A_hash_def)
   apply (block_vcg)
 
-   apply (block_vcg)
-
-    apply split_conds
-  apply (simp add: A_hash_def bytestr_def)
+  apply (simp add: bit_mask_rev[folded bytestr_def] ucast_A_hash)
     apply (block_vcg)
-
-
-  apply (blocks_rule_vcg; (rule refl)?)
-      apply triple_seq_vcg
-             apply clarsimp
-             apply order_sep_conj
-  apply (sep_cancel)
-             apply (sep_cancel)
-
-             apply clarsimp
-             apply (sep_cancel)
-             apply (simp add: Gverylow_def pure_def)
-             apply order_sep_conj
-  apply (sep_cancel)
-             apply (sep_cancel)
-             apply (simp add: Gverylow_def pure_def)
-  apply (sep_imp_solve simp: Gverylow_def)
-             apply order_sep_conj
-  apply (sep_cancel)
-             apply order_sep_conj
-  apply (sep_cancel)
-             apply order_sep_conj
-  apply (sep_cancel)
-             apply order_sep_conj
-  apply (sep_cancel)
-             apply order_sep_conj
-           apply (sep_cancel)
-  apply (simp add: word_rcat_simps)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-           apply (order_sep_conj, sep_cancel)
-  find_theorems length word_rsplit 32
-           apply (clarsimp simp: Gverylow_def length_word_rsplit_32 Cmem_def gas_simps Gmemory_def M_def)
-  apply assumption
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-           apply (clarsimp simp: Gverylow_def length_word_rsplit_32 Cmem_def gas_simps Gmemory_def M_def word_rcat_simps)
-  apply sep_cancel
-  apply sep_cancel
-          apply sep_cancel
-           apply (clarsimp simp: Gverylow_def length_word_rsplit_32 Cmem_def gas_simps Gmemory_def M_def)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-           apply (clarsimp simp: Gverylow_def length_word_rsplit_32 Cmem_def gas_simps Gmemory_def M_def word_rcat_simps)
-          apply sep_cancel
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-           apply (clarsimp simp: Gverylow_def length_word_rsplit_32 Cmem_def gas_simps Gmemory_def M_def word_rcat_simps)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-           apply (clarsimp simp: Gverylow_def length_word_rsplit_32 Cmem_def gas_simps Gmemory_def M_def word_rcat_simps)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-           apply (clarsimp simp: Gverylow_def length_word_rsplit_32 Cmem_def gas_simps Gmemory_def M_def word_rcat_simps)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-           apply (clarsimp simp: Gverylow_def length_word_rsplit_32 Cmem_def gas_simps Gmemory_def M_def word_rcat_simps)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-             apply (order_sep_conj, sep_cancel)
-           apply (clarsimp simp: Gverylow_def length_word_rsplit_32 Cmem_def gas_simps Gmemory_def M_def word_rcat_simps inst_size_def)
-      apply (order_sep_conj, sep_cancel)
-  apply simp
-    apply (clarsimp simp: Gverylow_def length_word_rsplit_32 Cmem_def gas_simps Gmemory_def M_def word_rcat_simps inst_size_def)
-  apply (rule conjI, rule refl, rule refl)
-(*   apply triple_blocks_vcg
+                      apply clarsimp
+    apply (block_vcg)
+  
+  apply (clarsimp simp: eip150_block_def)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (simp add: bit_mask_rev[folded bytestr_def] m_and_a_and_m_simp)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
   apply (block_vcg)
- *)  apply split_conds
-  apply (blocks_rule_vcg; (rule refl)?)
-      apply triple_seq_vcg
-             apply clarsimp
-             apply order_sep_conj
-  apply (sep_cancel)
-             apply (sep_cancel)
-
-
-          apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
-
+  defer
+  defer
+  apply (clarsimp simp: B_insts_def)
+  apply clarsimp
+    apply clarsimp
+  apply split_conds
+    apply (simp add: bit_mask_rev[folded bytestr_def] m_and_a_and_m_simp)
+  apply (simp add: A_hash_def)
   oops
 
 lemma A_calls_B_spec:

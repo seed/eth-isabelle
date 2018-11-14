@@ -423,9 +423,9 @@ inductive triple_inst_storage :: "network \<Rightarrow> pred \<Rightarrow> pos_i
           (program_counter (n + 1) \<and>* stack_height h \<and>* storage idx new \<and>*
            gas_pred (g - Csstore old new) \<and>* continuing  \<and>* rest)"
 
-inductive triple_inst_info :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
+inductive triple_inst_info :: "network \<Rightarrow> pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
  inst_callvalue:
-    "triple_inst_info
+    "triple_inst_info net
       (\<langle> h \<le> 1023 \<and> Gbase \<le> g\<rangle> \<and>*
        continuing \<and>* program_counter n \<and>*
        stack_height h \<and>* sent_value w \<and>*
@@ -436,7 +436,7 @@ inductive triple_inst_info :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred \<
        stack_height (Suc h) \<and>* gas_pred (g - Gbase) \<and>*
        stack h w \<and>* rest)"
  |  inst_calldatasize:
-    "triple_inst_info
+    "triple_inst_info net
       (\<langle> h \<le> 1023 \<and> Gbase \<le> g\<rangle> \<and>*
        continuing \<and>* program_counter n \<and>*
        stack_height h \<and>* sent_data data \<and>*
@@ -447,7 +447,7 @@ inductive triple_inst_info :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred \<
        stack_height (Suc h) \<and>* gas_pred (g - Gbase) \<and>*
        stack h (word256FromNat (length data)) \<and>* rest)"
 | inst_caller:
-    "triple_inst_info
+    "triple_inst_info net
       (\<langle> h \<le> 1023 \<and> Gbase \<le> g\<rangle> \<and>*
        continuing \<and>* program_counter n \<and>*
        stack_height h \<and>* caller c \<and>*
@@ -457,6 +457,26 @@ inductive triple_inst_info :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred \<
        continuing \<and>* caller c \<and>*
        stack_height (Suc h) \<and>* gas_pred (g - Gbase) \<and>*
        stack h (ucast c) \<and>* rest)"
+| inst_extcodesize:
+    "triple_inst_info net
+    (\<langle> h \<le> 1023 \<and>  Gextcode net \<le> g\<rangle> \<and>*
+           stack_height (h + 1) \<and>* stack h addr \<and>*
+           program_counter n \<and>* gas_pred g \<and>* continuing  \<and>*
+           ext_program_size (ucast addr) sz \<and>* rest)
+          (n, Info EXTCODESIZE)
+          (program_counter (n + 1) \<and>* stack_height (Suc h) \<and>* stack h (word_of_int sz) \<and>*
+           gas_pred (g - Gextcode net) \<and>* continuing  \<and>*
+           ext_program_size (ucast addr) sz \<and>* rest)"
+| inst_gas:
+    "triple_inst_info net
+      (\<langle> h \<le> 1023 \<and> Gbase \<le> g\<rangle> \<and>*
+       continuing \<and>* program_counter n \<and>*
+       stack_height h \<and>* gas_pred g \<and>* rest)
+      (n, Info GAS)
+      (program_counter (n + 1) \<and>*
+       continuing \<and>* stack_height (Suc h) \<and>*
+       gas_pred (g - Gbase) \<and>*
+       stack h (word_of_int g) \<and>* rest)"
 
 definition
  log_gas :: "int \<Rightarrow> w256 \<Rightarrow> w256 \<Rightarrow> int \<Rightarrow> int" where
@@ -491,7 +511,7 @@ inductive triple_inst :: "network \<Rightarrow> pred \<Rightarrow> pos_inst \<Ri
 | inst_bits :
     "triple_inst_bits p (n, Bits i) q \<Longrightarrow> triple_inst net p (n, Bits i) q"
 | inst_info :
-    "triple_inst_info p (n, Info i) q \<Longrightarrow> triple_inst net p (n, Info i) q"
+    "triple_inst_info net p (n, Info i) q \<Longrightarrow> triple_inst net p (n, Info i) q"
 | inst_memory :
     "triple_inst_memory p (n, Memory i) q \<Longrightarrow> triple_inst net p (n, Memory i) q"
 | inst_storage :
