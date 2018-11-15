@@ -363,9 +363,9 @@ lemma ucast_A_hash:
  "UCAST(32 \<rightarrow> 256) A_hash = 0x44FD4FA0"
   by (simp add: A_hash_def)
 
-method sep_conj_destroy methods m uses simp =
-  clarsimp?,
-  (rule conjI; (clarsimp simp: simp | m)) | m
+
+definition B_f_hash :: "32 word" where
+ "B_f_hash \<equiv> 0x26121ff0"
 
 definition
   "eip150_block \<equiv> 2463*1000"
@@ -378,7 +378,46 @@ lemma ucast_160_cancels_mask[simp]:
  "UCAST(256 \<rightarrow> 160) (addr && 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) = UCAST(256 \<rightarrow> 160) addr"
   by(simp add: address_mask ucast_mask_drop)
 
-lemma
+lemma add_n_eq_Suc:
+ "n + 6 = Suc (Suc (Suc (Suc (Suc (Suc n)))))"
+ "n + 7 = Suc (Suc (Suc (Suc (Suc (Suc (Suc n))))))"
+ "n + 8 = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc n)))))))"
+ "n + 9 = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc n))))))))"
+ "n + 10 = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc n)))))))))"
+ "n + 11 = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc n))))))))))"
+  by simp+
+
+lemma n_eq_Suc:
+ "6 = Suc (Suc (Suc (Suc (Suc (Suc 0)))))"
+ "7 = Suc (Suc (Suc (Suc (Suc (Suc (Suc 0))))))"
+ "8 = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc 0)))))))"
+ "9 = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc 0))))))))"
+ "10 = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc 0)))))))))"
+ "11 = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc 0))))))))))"
+  by simp+
+
+lemma word_rsplit_Cons:
+ "(\<exists>c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15 c16 c17 c18 c19 c20 c21 c22 c23 c24 c25
+  c26 c27 c28 c29 c30 c31 c32. (word_rsplit :: 256 word \<Rightarrow> byte list) w = [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, c22, c23, c24, c25,
+  c26, c27, c28, c29, c30, c31, c32])"
+apply(insert length_word_rsplit_32[where x=w])
+apply(case_tac "word_rsplit w::byte list"; clarsimp)
+apply ((rename_tac list, case_tac list; clarsimp))+  
+done
+
+lemma memory_4_range_split:
+ "(memory addr w ** R) = (memory_range addr (take 4 (word_rsplit w)) ** memory_range (addr + 4) (drop 4 (word_rsplit w)) ** R)"
+  using word_rsplit_Cons[where w=w]
+  apply (clarsimp simp: memory_def )
+  apply (rule ext, rule iffI)
+   apply ((sep_cancel)+, simp add: add.commute)+
+  done
+
+lemma take_4_word_rsplit:
+ "(take 4 (word_rsplit (0x26121FF000000000000000000000000000000000000000000000000000000000::256 word)) :: byte list) = [0x26, 0x12, 0x1F, 0xF0]"
+  by simp
+
+lemma bbtriple_A:
   notes
   address_mask_ucast[simp]
   address_mask_ucast[simplified word_bool_alg.conj.commute, simp]
@@ -392,15 +431,16 @@ lemma
 shows
  "unat bn > eip150_block
  \<Longrightarrow> at_least_eip150 net
- \<Longrightarrow> \<exists>Q. bbtriple net
+ \<Longrightarrow> \<exists>Q. \<exists>callgas. bbtriple net
    ( program_counter 0 ** stack_height 0 **
      sent_data (bytestr A_hash) **
      sent_value 0 ** caller sender ** blk_num bn **
      memory_usage 0 ** continuing ** gas_pred 100000 **
-     storage 0 B_ptr **
+     storage 0 (UCAST(160\<rightarrow>256) B_ptr) **
      storage 1 v **
      account_existence sender sender_ex  **
      account_existence to to_ex **
+     account_existence B_ptr True  **
      memory (0::w256) m0x0 **
      memory (0x20::w256) m0x20 **
      memory (0x40::w256) (bytestr_to_w256 [x]) **
@@ -408,9 +448,13 @@ shows
      memory (0x80::w256) m0x80 **
      log_number log_num **
      this_account this **
-      ext_program_size (UCAST(256 \<rightarrow> 160) B_ptr) (length B_insts))
-   (blocks_A_insts) (action (ContractCall args) ** Q)"
+      ext_program_size B_ptr (length B_insts))
+   (blocks_A_insts) (action (ContractCall 
+\<lparr>callarg_gas = callgas, callarg_code = B_ptr,
+ callarg_recipient = B_ptr, callarg_value = 0, callarg_data = word_rsplit B_f_hash::byte list,
+                callarg_output_begin = 0x80, callarg_output_size = 0x20\<rparr>) ** Q)"
   including dispatcher_bundle
+  apply (rule exI)
   apply (rule exI)
   apply (simp add: blocks_A_insts_simp)
   apply (simp add: bbtriple_def )
@@ -420,7 +464,7 @@ shows
 
   apply (simp add: bit_mask_rev[folded bytestr_def] ucast_A_hash)
     apply (block_vcg)
-                      apply clarsimp
+    apply clarsimp
     apply (block_vcg)
   
   apply (clarsimp simp: eip150_block_def)
@@ -465,22 +509,71 @@ shows
   apply (sep_imp_solve simp: word_rcat_simps)
   apply (sep_imp_solve simp: word_rcat_simps)
   apply (sep_imp_solve simp: word_rcat_simps)
-  apply (block_vcg)
-  defer
-  defer
-  apply (clarsimp simp: B_insts_def)
-  apply clarsimp
-    apply clarsimp
-  apply split_conds
-    apply (simp add: bit_mask_rev[folded bytestr_def] m_and_a_and_m_simp)
-  apply (simp add: A_hash_def)
-  oops
+  apply (split_conds, ((blocks_rule_vcg; (rule refl)?), triple_seq_vcg))
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+  apply (sep_imp_solve simp: word_rcat_simps)
+      apply (clarsimp simp: add_n_eq_Suc n_eq_Suc sep_stack_topmost_unfold_sep)
+  apply (subst (asm) memory_4_range_split[where addr="0x80"])
+      apply (rule conjI)
+  apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+  apply sep_cancel
+   apply (subst ucast_up_ucast_id, simp (no_asm) add: is_up)
+   apply sep_cancel+
+  
+  apply (clarsimp simp del: word_rsplit_no_cl simp: is_up ucast_up_ucast_id)
+  apply (sep_imp_solve simp: word_rcat_simps Ccallgas_def calc_memu_extra_def L_def )
+     apply (simp add: B_f_hash_def take_4_word_rsplit is_up ucast_up_ucast_id del: word_rsplit_no_cl)
+  apply (simp (no_asm) add: )
+     apply (sep_imp_solve simp: word_rcat_simps)
+  apply (simp add: B_insts_def)+
+  apply (block_vcg simp: bit_mask_rev[folded bytestr_def] ucast_A_hash)
+  done
 
 lemma A_calls_B_spec:
-  " triple_sem_t net P (set (add_address (A_insts))) Q"
+  " at_least_eip150 net \<Longrightarrow> eip150_block < unat bn \<Longrightarrow>
+  \<exists>Q. \<exists>callgas. triple_sem_t net ( program_counter 0 ** stack_height 0 **
+     sent_data (bytestr A_hash) **
+     sent_value 0 ** caller sender ** blk_num bn **
+     memory_usage 0 ** continuing ** gas_pred 100000 **
+     storage 0 (UCAST(160\<rightarrow>256) B_ptr) **
+     storage 1 v **
+     account_existence sender sender_ex  **
+     account_existence to to_ex **
+     account_existence B_ptr True  **
+     memory (0::w256) m0x0 **
+     memory (0x20::w256) m0x20 **
+     memory (0x40::w256) (bytestr_to_w256 [x]) **
+     memory (0x60::w256) (bytestr_to_w256 [y]) **
+     memory (0x80::w256) m0x80 **
+     log_number log_num **
+     this_account this **
+      ext_program_size B_ptr (length B_insts)) (set (add_address (A_insts))) (action (ContractCall 
+\<lparr>callarg_gas = callgas, callarg_code = B_ptr,
+ callarg_recipient = B_ptr, callarg_value = 0, callarg_data = word_rsplit B_f_hash::byte list,
+                callarg_output_begin = 0x80, callarg_output_size = 0x20\<rparr>) ** Q)"
+  apply (rule exI)+
   apply (rule triple_soundness)
    apply (simp add: A_insts_def)
-  apply (simp only: A_bytestr_sz)
+   apply (simp only: A_bytestr_sz)
+  using bbtriple_A[where net=net and bn=bn and sender=sender and B_ptr=B_ptr and sender_ex=sender_ex and v=v and log_num=log_num and this=this and x=x and y=y
+                 and to=to and to_ex=to_ex]
+  apply clarsimp
+  apply (drule meta_spec)+
+  apply clarsimp
+  using [[unify_trace_failure,unify_trace_types,unify_trace_simp]]
+  apply (auto intro: bbtriple_A[where net=net and bn=bn and sender=sender and B_ptr=B_ptr and sender_ex=sender_ex and v=v and log_num=log_num and this=this and x=x and y=y
+                 and to=to and to_ex=to_ex])
+
   sorry
 
 lemma

@@ -362,6 +362,21 @@ inductive triple_inst_misc :: "network \<Rightarrow> pred \<Rightarrow> pos_inst
     (stack_height (Suc h) \<and>* stack h (ucast addr) \<and>*
      not_continuing \<and>*  account_existence addr existence \<and>*
      program_counter n \<and>* action (ContractSuicide addr) \<and>* gas_pred (g - Csuicide (\<not> existence) net) \<and>* rest)"
+| inst_call :
+    "triple_inst_misc net
+    (\<langle> h \<le> 1017 \<and> Ccallgas g' r value (\<not>existence) g net (calc_memu_extra m g' r value in_begin in_size out_begin out_size) \<le> g \<and> at_least_eip150 net \<and>
+       length in_data = unat in_size\<rangle> \<and>*
+     continuing \<and>* program_counter n \<and>* gas_pred g \<and>*
+     account_existence (ucast r) existence \<and>*
+     stack_topmost h [out_size, out_begin, in_size, in_begin, value, r, g'] \<and>* memory_usage m \<and>*
+     memory_range in_begin in_data \<and>* rest)
+    (n, Misc CALL)
+    (stack_topmost h [] \<and>* not_continuing \<and>*  account_existence (ucast r) existence \<and>*
+     program_counter (n + 1) \<and>* action (ContractCall \<lparr>callarg_gas=g', callarg_code=ucast r, callarg_recipient=ucast r,
+                                                      callarg_value=value, callarg_data=in_data, callarg_output_begin=out_begin,
+                                                      callarg_output_size = out_size\<rparr>) \<and>*
+     gas_pred (g - Ccallgas g' r value (\<not>existence) g net (calc_memu_extra m g' r value in_begin in_size out_begin out_size)) \<and>* 
+     memory_usage m \<and>* memory_range in_begin in_data \<and>* rest)"
 
 definition memory :: "w256 \<Rightarrow> w256 \<Rightarrow> state_element set_pred" where
 "memory ind w = memory_range ind (word_rsplit w)"

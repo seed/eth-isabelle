@@ -124,6 +124,10 @@ lemma action_not_stack:
 "stack n m s \<Longrightarrow> \<not> action a s"
 by(simp add: action_def stack_def)
 
+lemma account_existence_not_stack:
+"stack n m s \<Longrightarrow> \<not> account_existence a b s"
+by(simp add: account_existence_def stack_def)
+
 lemmas not_stack =
 action_not_stack
 program_counter_not_stack
@@ -137,6 +141,7 @@ memory_not_stack
 memory_range_not_stack
 stack_height_not_stack
 memory_elm_not_stack
+account_existence_not_stack
 
 lemma stack_height_first:
 "(a \<and>* stack_height h \<and>* b) = (stack_height h \<and>* a \<and>* b)"
@@ -167,8 +172,8 @@ method sep_imp_solve uses simp =
  | solves \<open>match conclusion in "block_lookup _ _ = Some _"  \<Rightarrow> \<open>simp add:word_rcat_simps\<close>
              , (rule conjI, (rule refl)+)\<close>
  | solves \<open>simp\<close>
- | solves \<open>(clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:simp|rule conjI)+)[1])\<close>
- | solves \<open>(clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|(clarsimp split:if_split simp: simp)|rule conjI)+)[1])\<close>
+ | solves \<open>(clarsimp?, order_sep_conj, ((((sep_cancel, (clarsimp simp add: is_up ucast_up_ucast_id)?)+)|simp add:simp|rule conjI)+)[1])\<close>
+ | solves \<open>(clarsimp?, order_sep_conj, ((((sep_cancel, (clarsimp simp add: is_up ucast_up_ucast_id)?)+)|(clarsimp split:if_split simp: simp)|rule conjI)+)[1])\<close>
  | solves \<open>(clarsimp split:if_splits simp:word_rcat_simps) ; sep_imp_solve \<close>
 
 method split_conds =
@@ -864,11 +869,29 @@ lemma  stack_topmost_unfold_sep:
   apply blast
   done
 
+lemma  stack_topmost_unfold_sep':
+  "(stack_topmost h [a, b, c, d, e, f, g] ** R)
+  = (stack_height (Suc (Suc (Suc (Suc (Suc (Suc (Suc h))))))) ** stack h a ** stack (Suc h) b  ** stack (Suc (Suc h)) c** stack (Suc (Suc (Suc h))) d  
+  ** stack (Suc (Suc (Suc (Suc h)))) e  ** stack (Suc (Suc (Suc (Suc (Suc h))))) f ** stack (Suc (Suc (Suc (Suc (Suc (Suc h)))))) g ** R)"
+  apply (unfold stack_topmost_def)
+  apply clarsimp
+  apply (rule ext)
+  apply (rule iffI[rotated])
+  apply (clarsimp simp add: sep_basic_simps stack_def stack_height_def )
+  apply (drule_tac x=yg in spec)
+   apply blast
+  apply (clarsimp simp add: sep_basic_simps stack_def stack_height_def )
+  apply (safe| rule exI)+
+  sorry
+
 lemma sep_stack_topmost_unfold_sep:
   "(R' ** stack_topmost h [a, b, c, d, e] ** R)
   = (R' ** stack_height (Suc (Suc (Suc (Suc (Suc h))))) ** stack h a ** stack (Suc h) b  ** stack (Suc (Suc h)) c** stack (Suc (Suc (Suc h))) d  
   ** stack (Suc (Suc (Suc (Suc h)))) e ** R)"
-  by (sep_simp simp: stack_topmost_unfold_sep)
+"(R' ** stack_topmost h [a, b, c, d, e, f, g] ** R)
+  = (R' ** stack_height (Suc (Suc (Suc (Suc (Suc (Suc (Suc h))))))) ** stack h a ** stack (Suc h) b  ** stack (Suc (Suc h)) c** stack (Suc (Suc (Suc h))) d  
+  ** stack (Suc (Suc (Suc (Suc h)))) e ** stack (Suc (Suc (Suc (Suc (Suc h))))) f ** stack (Suc (Suc (Suc (Suc (Suc (Suc h)))))) g ** R)"
+  by (sep_simp simp:  stack_topmost_unfold_sep stack_topmost_unfold_sep')+
 
 lemma memory_range_last:
  "unat (len::w256) = length data \<Longrightarrow> 
