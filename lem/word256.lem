@@ -50,7 +50,7 @@ let size256 = 2 ** 256
 
 val word256ToInteger : word256 -> integer
 let word256ToInteger w = integerFromBitSeq (w256_to_bs w)
-declare isabelle target_rep function word256ToInteger = `sint`
+declare isabelle target_rep function word256ToInteger = `uint`
 declare coq target_rep function word256ToInteger = `two_compl_value` `255`
 
 declare isabelle target_rep function w256_to_bs = (fun w -> bitSeqFromInteger (Just 256) (word256ToInteger w))

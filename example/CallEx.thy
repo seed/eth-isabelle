@@ -367,7 +367,7 @@ lemma ucast_A_hash:
 definition B_f_hash :: "32 word" where
  "B_f_hash \<equiv> 0x26121ff0"
 
-definition
+definition eip150_block :: int where
   "eip150_block \<equiv> 2463*1000"
 
 lemma m_and_a_and_m_simp:
@@ -416,6 +416,10 @@ lemma memory_4_range_split:
 lemma take_4_word_rsplit:
  "(take 4 (word_rsplit (0x26121FF000000000000000000000000000000000000000000000000000000000::256 word)) :: byte list) = [0x26, 0x12, 0x1F, 0xF0]"
   by simp
+
+lemma ucast_256_160_cancel[simp]:
+ "UCAST(256 \<rightarrow> 160) (UCAST(160 \<rightarrow> 256) w) = w"
+  by (simp add: is_up ucast_up_ucast_id)
 
 lemma bbtriple_A:
   notes
@@ -561,23 +565,25 @@ lemma A_calls_B_spec:
 \<lparr>callarg_gas = callgas, callarg_code = B_ptr,
  callarg_recipient = B_ptr, callarg_value = 0, callarg_data = word_rsplit B_f_hash::byte list,
                 callarg_output_begin = 0x80, callarg_output_size = 0x20\<rparr>) ** Q)"
-  apply (rule exI)+
+  using bbtriple_A[where net=net and bn=bn and sender=sender and B_ptr=B_ptr and sender_ex=sender_ex and v=v and log_num=log_num and this=this and x=x and y=y
+                 and to=to and to_ex=to_ex and ?m0x0.0=m0x0 and  ?m0x20.0=m0x20 and ?m0x80.0=m0x80]
+  apply clarsimp
+  apply (rule_tac x=Q in exI)
+  apply (rule_tac x=callgas in exI)
   apply (rule triple_soundness)
    apply (simp add: A_insts_def)
-   apply (simp only: A_bytestr_sz)
-  using bbtriple_A[where net=net and bn=bn and sender=sender and B_ptr=B_ptr and sender_ex=sender_ex and v=v and log_num=log_num and this=this and x=x and y=y
-                 and to=to and to_ex=to_ex]
+   apply (simp only: A_bytestr_sz )
+  apply (fold blocks_A_insts_def)
   apply clarsimp
-  apply (drule meta_spec)+
-  apply clarsimp
-  using [[unify_trace_failure,unify_trace_types,unify_trace_simp]]
-  apply (auto intro: bbtriple_A[where net=net and bn=bn and sender=sender and B_ptr=B_ptr and sender_ex=sender_ex and v=v and log_num=log_num and this=this and x=x and y=y
-                 and to=to and to_ex=to_ex])
+  done
 
-  sorry
+lemma blk_gt_eip150_imp_gt_homestead:
+ "eip150_block < uint (block_number bi)  \<Longrightarrow> homestead_block < uint (block_number bi)"
+  by (auto simp: homestead_block_def eip150_block_def)
 
-lemma
-  "sint (block_number bi) \<ge> homestead_block \<Longrightarrow> 
+lemma run_transaction:
+  "at_least_eip150 net \<Longrightarrow>
+  eip150_block < uint (block_number bi) \<Longrightarrow>
   global_sem net (case start_transaction tr accounts bi of Continue x \<Rightarrow> x) = Some v"
   apply clarsimp
 
@@ -585,7 +591,8 @@ lemma
    apply (clarsimp simp: start_trans)
    apply (clarsimp simp: get_vctx_gas_def create_env_def)
    apply (clarsimp simp: calc_igas_def tr_gas_limit'_def)
-  apply simp  
+   apply (drule blk_gt_eip150_imp_gt_homestead)
+   apply simp
   apply (clarsimp simp add: Let_def split: instruction_result.splits)
   apply (rule conjI)
   apply (clarsimp split: global_state.split)
@@ -593,6 +600,11 @@ lemma
   apply clarsimp
    apply (clarsimp simp: build_cctx_update_world)
    apply (subst update_world_simp, fastforce simp: addrs_uniq[symmetric])+
+   apply (frule A_calls_B_spec[simplified triple_sem_t_def, where bn="block_number bi"])
+    apply (simp add: uint_nat)
+  apply clarsimp
+  find_theorems int unat uint
+  apply simp
   apply (rule conjI)
     apply clarsimp
     apply (clarsimp simp: global_step_def)
@@ -600,8 +612,7 @@ lemma
     apply (clarsimp simp: tr_gas_limit'_def calc_igas_def bi_def homestead_block_def)
   apply (clarsimp simp add: program_sem_t_no_gas_not_continuing split: instruction_result.splits)
   apply (clarsimp simp: program_sem_t.simps vctx_next_instruction_def)
-  using A_calls_B_spec[simplified triple_sem_t_def]
-  
+  apply clarsimp
     apply (case_tac "global_step net _ ")
   oops
 

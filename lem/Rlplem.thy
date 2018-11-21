@@ -133,7 +133,7 @@ definition RLP_nat  :: " nat \<Rightarrow>(byte0)list "  where
 
 (*val RLP_w256 : word256 -> tree*)
 definition RLP_w256  :: " 256 word \<Rightarrow> tree "  where 
-     " RLP_w256 i = ( Leaf (BE (nat (abs (sint i)))))"
+     " RLP_w256 i = ( Leaf (BE (nat (abs (uint i)))))"
 
 
 (*val word_rsplit160 : word160 -> list byte*)
