@@ -62,7 +62,7 @@ definition
   Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF]), Bits inst_AND, Dup 0, Stack (PUSH_N [0x44, 0xFD, 0x4F, 0xA0]), Arith inst_EQ,
   Stack (PUSH_N [0, 0x46]), Pc JUMPI, Pc JUMPDEST, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Info CALLVALUE, Dup 0,
   Arith ISZERO, Stack (PUSH_N [0, 0x52]), Pc JUMPI, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Stack POP,
-  Stack (PUSH_N [0, 0x5B]), Stack (PUSH_N [0, 0x71]), Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Dup 2, Dup 1,
+  Stack (PUSH_N [1, 0x5B]), Stack (PUSH_N [0, 0x71]), Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Dup 2, Dup 1,
   Memory MSTORE, Stack (PUSH_N [0x20]), Arith ADD, Swap 1, Stack POP, Stack POP, Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Swap 1,
   Arith SUB, Swap 0, Misc RETURN, Pc JUMPDEST, Stack (PUSH_N [0]), Dup 0, Stack (PUSH_N [0]), Swap 0, Storage SLOAD, Swap 0,
   Stack (PUSH_N [1, 0]), Arith EXP, Swap 0, Arith DIV,
@@ -585,6 +585,22 @@ lemma run_transaction:
   "at_least_eip150 net \<Longrightarrow>
   eip150_block < uint (block_number bi) \<Longrightarrow>
   global_sem net (case start_transaction tr accounts bi of Continue x \<Rightarrow> x) = Some v"
+oops
+
+lemma start_transaction_neq_unimplemented:
+ "start_transaction tr accounts bi \<noteq> Unimplemented"
+  by (simp add: start_transaction_def Let_def split:if_splits option.splits)
+
+lemma start_transaction_eq_cont[rule_format]:
+ "start_transaction tr accounts bi = Continue g \<longrightarrow> (\<exists>ic. g_vmstate g = InstructionContinue ic) = (tr_to tr \<noteq> None)"
+  apply (clarsimp simp add: start_transaction_def Let_def split: option.splits)
+  apply (safe ; simp)
+  done
+
+
+lemma
+  "sint (block_number bi) \<ge> homestead_block \<Longrightarrow> start_transaction tr accounts bi = Continue x \<Longrightarrow>
+  global_sem net x = Some v"
   apply clarsimp
 
   apply (rule context_conjI)
@@ -593,6 +609,21 @@ lemma run_transaction:
    apply (clarsimp simp: calc_igas_def tr_gas_limit'_def)
    apply (drule blk_gt_eip150_imp_gt_homestead)
    apply simp
+  apply simp
+  apply (case_tac "g_vmstate x";clarsimp)
+   defer
+   apply (frule start_transaction_eq_cont)
+   apply (clarsimp simp add: tr_def)
+  apply (clarsimp split: global_state.split)
+   apply (rule conjI)+
+  using start_transaction_neq_unimplemented
+    apply (simp add: start_transaction_neq_unimplemented)
+  apply safe
+          apply clarsimp
+  defer
+  apply clarsimp
+  apply (clarsimp split: instruction_result.splits )
+  apply (rule conjI; clarsimp split: global_state.split)
   apply (clarsimp simp add: Let_def split: instruction_result.splits)
   apply (rule conjI)
   apply (clarsimp split: global_state.split)
