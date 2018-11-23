@@ -62,7 +62,7 @@ definition
   Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF]), Bits inst_AND, Dup 0, Stack (PUSH_N [0x44, 0xFD, 0x4F, 0xA0]), Arith inst_EQ,
   Stack (PUSH_N [0, 0x46]), Pc JUMPI, Pc JUMPDEST, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Info CALLVALUE, Dup 0,
   Arith ISZERO, Stack (PUSH_N [0, 0x52]), Pc JUMPI, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Stack POP,
-  Stack (PUSH_N [1, 0x5B]), Stack (PUSH_N [0, 0x71]), Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Dup 2, Dup 1,
+  Stack (PUSH_N [0, 0x5B]), Stack (PUSH_N [0, 0x71]), Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Dup 2, Dup 1,
   Memory MSTORE, Stack (PUSH_N [0x20]), Arith ADD, Swap 1, Stack POP, Stack POP, Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Swap 1,
   Arith SUB, Swap 0, Misc RETURN, Pc JUMPDEST, Stack (PUSH_N [0]), Dup 0, Stack (PUSH_N [0]), Swap 0, Storage SLOAD, Swap 0,
   Stack (PUSH_N [1, 0]), Arith EXP, Swap 0, Arith DIV,
@@ -597,9 +597,39 @@ lemma start_transaction_eq_cont[rule_format]:
   apply (safe ; simp)
   done
 
+lemma program_sem_t_to_env:
+ "\<exists>action vctx ret. program_sem_t const net ir = InstructionToEnvironment action vctx ret"
+  using program_sem_t_not_continue[of const net ir]
+  by (case_tac "program_sem_t const net ir" ; clarsimp)
+
+lemma env_step_conds:
+ "envstep net (x\<lparr>g_vmstate := InstructionToEnvironment act vctx r\<rparr>) = Unimplemented
+  \<Longrightarrow> program_sem_t (g_cctx x) net (g_vmstate x) = InstructionToEnvironment act vctx r
+  \<Longrightarrow> (case act of ContractCall x \<Rightarrow>  callarg_recipient x <s 0x100
+      | ContractReturn f \<Rightarrow> snd (snd (snd (hd (g_stack x)))) = NoHint \<or> vctx_gas (fst (snd (hd (g_stack x)))) < 0
+      | ContractFail f \<Rightarrow> vctx_gas (fst (snd (hd (g_stack x)))) < 0
+      | ContractSuicide f \<Rightarrow> vctx_gas (fst (snd (hd (g_stack x)))) < 0
+      | _ \<Rightarrow> False)"
+  apply (clarsimp simp: Let_def envstep_def)
+  apply (case_tac act; clarsimp simp: Let_def split: list.splits if_splits stack_hint.splits)
+  done
+
+lemma global_step_unimplemented:
+ "global_step net x = Unimplemented \<Longrightarrow>
+  \<exists>act vctx r. program_sem_t (g_cctx x) net (g_vmstate x) = InstructionToEnvironment act vctx r \<longrightarrow> 
+  (case act of ContractCall x \<Rightarrow>  callarg_recipient x <s 0x100
+      | ContractReturn f \<Rightarrow> snd (snd (snd (hd (g_stack x)))) = NoHint \<or> vctx_gas (fst (snd (hd (g_stack x)))) < 0
+      | ContractFail f \<Rightarrow> vctx_gas (fst (snd (hd (g_stack x)))) < 0
+      | ContractSuicide f \<Rightarrow> vctx_gas (fst (snd (hd (g_stack x)))) < 0
+      | _ \<Rightarrow> False)"
+  using program_sem_t_to_env[of "g_cctx x" net "g_vmstate x"]
+  apply (clarsimp simp add: global_step_def)
+  apply (frule (1) env_step_conds)
+  apply (fastforce simp: envstep_def Let_def)
+  done
 
 lemma
-  "sint (block_number bi) \<ge> homestead_block \<Longrightarrow> start_transaction tr accounts bi = Continue x \<Longrightarrow>
+  "uint (block_number bi) \<ge> homestead_block \<Longrightarrow> start_transaction tr accounts bi = Continue x \<Longrightarrow>
   global_sem net x = Some v"
   apply clarsimp
 
@@ -607,44 +637,19 @@ lemma
    apply (clarsimp simp: start_trans)
    apply (clarsimp simp: get_vctx_gas_def create_env_def)
    apply (clarsimp simp: calc_igas_def tr_gas_limit'_def)
-   apply (drule blk_gt_eip150_imp_gt_homestead)
-   apply simp
-  apply simp
   apply (case_tac "g_vmstate x";clarsimp)
    defer
    apply (frule start_transaction_eq_cont)
    apply (clarsimp simp add: tr_def)
   apply (clarsimp split: global_state.split)
-   apply (rule conjI)+
+  apply (rule conjI)+
+  
   using start_transaction_neq_unimplemented
-    apply (simp add: start_transaction_neq_unimplemented)
-  apply safe
-          apply clarsimp
-  defer
-  apply clarsimp
-  apply (clarsimp split: instruction_result.splits )
-  apply (rule conjI; clarsimp split: global_state.split)
-  apply (clarsimp simp add: Let_def split: instruction_result.splits)
-  apply (rule conjI)
-  apply (clarsimp split: global_state.split)
-   apply (simp (no_asm) add: start_trans create_env_def)
-  apply clarsimp
-   apply (clarsimp simp: build_cctx_update_world)
-   apply (subst update_world_simp, fastforce simp: addrs_uniq[symmetric])+
-   apply (frule A_calls_B_spec[simplified triple_sem_t_def, where bn="block_number bi"])
-    apply (simp add: uint_nat)
-  apply clarsimp
-  find_theorems int unat uint
-  apply simp
-  apply (rule conjI)
-    apply clarsimp
-    apply (clarsimp simp: global_step_def)
-  apply (clarsimp simp: envstep_def Let_def)
-    apply (clarsimp simp: tr_gas_limit'_def calc_igas_def bi_def homestead_block_def)
-  apply (clarsimp simp add: program_sem_t_no_gas_not_continuing split: instruction_result.splits)
-  apply (clarsimp simp: program_sem_t.simps vctx_next_instruction_def)
-  apply clarsimp
-    apply (case_tac "global_step net _ ")
+   apply (simp add: start_transaction_neq_unimplemented)
+   apply safe
+  apply (frule global_step_unimplemented)
+  apply (erule exE)+
+     apply clarsimp
   oops
 
 end
