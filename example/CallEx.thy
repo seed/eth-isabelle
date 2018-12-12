@@ -629,27 +629,27 @@ lemma global_step_unimplemented:
   done
 
 lemma
-  "uint (block_number bi) \<ge> homestead_block \<Longrightarrow> start_transaction tr accounts bi = Continue x \<Longrightarrow>
-  global_sem net x = Some v"
+  "uint (block_number bi) \<ge> homestead_block
+  \<Longrightarrow> start_transaction tr accounts bi = Continue x
+  \<Longrightarrow> global_sem net x = Some v \<Longrightarrow>
+   P v"
   apply clarsimp
 
-  apply (rule context_conjI)
    apply (clarsimp simp: start_trans)
    apply (clarsimp simp: get_vctx_gas_def create_env_def)
    apply (clarsimp simp: calc_igas_def tr_gas_limit'_def)
   apply (case_tac "g_vmstate x";clarsimp)
+
    defer
    apply (frule start_transaction_eq_cont)
    apply (clarsimp simp add: tr_def)
-  apply (clarsimp split: global_state.split)
-  apply (rule conjI)+
-  
-  using start_transaction_neq_unimplemented
-   apply (simp add: start_transaction_neq_unimplemented)
-   apply safe
-  apply (frule global_step_unimplemented)
-  apply (erule exE)+
-     apply clarsimp
+
+   apply (frule start_transaction_eq_cont, simp add: tr_def)
+
+  using A_calls_B_spec
+
+ 
+
   oops
 
 end
