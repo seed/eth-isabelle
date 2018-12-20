@@ -631,59 +631,7 @@ lemma global_step_unimplemented:
 
 lemma
   "uint (block_number bi) \<ge> homestead_block
-  \<Longrightarrow> start_transaction tr accounts bi = Continue  \<lparr>g_orig =
-        update_world accounts user
-         (accounts user
-          \<lparr>block_account_nonce := transaction_nonce + 1,
-             block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>),
-        g_stack = [],
-        g_current =
-          update_world
-           (update_world accounts user
-             (accounts user
-              \<lparr>block_account_nonce := transaction_nonce + 1,
-                 block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>))
-           A_addr
-           (update_world accounts user
-             (accounts user
-              \<lparr>block_account_nonce := transaction_nonce + 1,
-                 block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>)
-             A_addr),
-        g_cctx =
-          build_cctx0
-           (update_world accounts user
-             (accounts user
-              \<lparr>block_account_nonce := transaction_nonce + 1,
-                 block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>)
-             A_addr),
-        g_killed = [],
-        g_vmstate =
-          InstructionContinue
-           (create_env
-             (update_world accounts user
-               (accounts user
-                \<lparr>block_account_nonce := transaction_nonce + 1,
-                   block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>)
-               A_addr)
-             (update_world
-               (update_world accounts user
-                 (accounts user
-                  \<lparr>block_account_nonce := transaction_nonce + 1,
-                     block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>))
-               A_addr
-               (update_world accounts user
-                 (accounts user
-                  \<lparr>block_account_nonce := transaction_nonce + 1,
-                     block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>)
-                 A_addr))
-             0 []
-             (uint tr_gas_limit' -
-              calc_igas
-               \<lparr>tr_from = user, tr_to = Some A_addr, tr_gas_limit = tr_gas_limit', tr_gas_price = 0x64,
-                  tr_value = 0, tr_nonce = transaction_nonce, tr_data = []\<rparr>
-               bi)
-             user user 0x64 bi),
-        g_create = False\<rparr>
+  \<Longrightarrow> start_transaction tr accounts bi = Continue  x
   \<Longrightarrow> global_sem net x = Some v \<Longrightarrow>
    P v"
   apply clarsimp
@@ -691,19 +639,9 @@ lemma
    apply (clarsimp simp: start_trans)
    apply (clarsimp simp: get_vctx_gas_def create_env_def)
   apply (clarsimp simp: calc_igas_def tr_gas_limit'_def)
-
-  using [[show_types]]
-  apply (case_tac "g_vmstate x";clarsimp)
-
-   defer
-   apply (frule start_transaction_eq_cont)
-   apply (clarsimp simp add: tr_def)
-
-   apply (frule start_transaction_eq_cont, simp add: tr_def)
-
+  apply (thin_tac "x = P" for P)
+  apply (simp add: global_step_def split: global_state.splits)
   using A_calls_B_spec
-
- 
 
   oops
 
