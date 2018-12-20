@@ -145,7 +145,7 @@ definition accounts :: "address \<Rightarrow> block_account"  where
 term start_transaction
 term global_sem
 
-definition
+definition tr_gas_limit' :: w256 where
  "tr_gas_limit' \<equiv> 0x1000000"
 
 definition tr :: transaction where
@@ -154,7 +154,8 @@ definition tr :: transaction where
 definition coinbase :: address where
  "coinbase \<equiv> 0x88888888888888"
 
-definition "block_gaslimit' \<equiv> 0x1000000000000000"
+definition  block_gaslimit' :: w256 where
+ "block_gaslimit' \<equiv> 0x1000000000000000"
 
 definition bi :: block_info where
  "bi \<equiv> \<lparr> block_blockhash = undefined, block_coinbase = coinbase, block_timestamp = 0x6660000000, block_number= 100000000, block_difficulty = 0, block_gaslimit = block_gaslimit' \<rparr>"
@@ -630,14 +631,68 @@ lemma global_step_unimplemented:
 
 lemma
   "uint (block_number bi) \<ge> homestead_block
-  \<Longrightarrow> start_transaction tr accounts bi = Continue x
+  \<Longrightarrow> start_transaction tr accounts bi = Continue  \<lparr>g_orig =
+        update_world accounts user
+         (accounts user
+          \<lparr>block_account_nonce := transaction_nonce + 1,
+             block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>),
+        g_stack = [],
+        g_current =
+          update_world
+           (update_world accounts user
+             (accounts user
+              \<lparr>block_account_nonce := transaction_nonce + 1,
+                 block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>))
+           A_addr
+           (update_world accounts user
+             (accounts user
+              \<lparr>block_account_nonce := transaction_nonce + 1,
+                 block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>)
+             A_addr),
+        g_cctx =
+          build_cctx0
+           (update_world accounts user
+             (accounts user
+              \<lparr>block_account_nonce := transaction_nonce + 1,
+                 block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>)
+             A_addr),
+        g_killed = [],
+        g_vmstate =
+          InstructionContinue
+           (create_env
+             (update_world accounts user
+               (accounts user
+                \<lparr>block_account_nonce := transaction_nonce + 1,
+                   block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>)
+               A_addr)
+             (update_world
+               (update_world accounts user
+                 (accounts user
+                  \<lparr>block_account_nonce := transaction_nonce + 1,
+                     block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>))
+               A_addr
+               (update_world accounts user
+                 (accounts user
+                  \<lparr>block_account_nonce := transaction_nonce + 1,
+                     block_account_balance := block_account_balance (accounts user) - 0x64 * tr_gas_limit'\<rparr>)
+                 A_addr))
+             0 []
+             (uint tr_gas_limit' -
+              calc_igas
+               \<lparr>tr_from = user, tr_to = Some A_addr, tr_gas_limit = tr_gas_limit', tr_gas_price = 0x64,
+                  tr_value = 0, tr_nonce = transaction_nonce, tr_data = []\<rparr>
+               bi)
+             user user 0x64 bi),
+        g_create = False\<rparr>
   \<Longrightarrow> global_sem net x = Some v \<Longrightarrow>
    P v"
   apply clarsimp
 
    apply (clarsimp simp: start_trans)
    apply (clarsimp simp: get_vctx_gas_def create_env_def)
-   apply (clarsimp simp: calc_igas_def tr_gas_limit'_def)
+  apply (clarsimp simp: calc_igas_def tr_gas_limit'_def)
+
+  using [[show_types]]
   apply (case_tac "g_vmstate x";clarsimp)
 
    defer
