@@ -629,19 +629,94 @@ lemma global_step_unimplemented:
   apply (fastforce simp: envstep_def Let_def)
   done
 
+lemma envstep_continue:
+ "\<exists>x. g_vmstate gl = InstructionContinue x
+ \<Longrightarrow> envstep net gl = Continue gl"
+  by (clarsimp simp: envstep_def)
+
+lemma build_cctx0_simp:
+ "build_cctx0
+                 (update_world accounts user
+                   (accounts user
+                    \<lparr>block_account_nonce := transaction_nonce + 1,
+                       block_account_balance := block_account_balance (accounts user) - 0x64000000\<rparr>)
+                   A_addr) = \<lparr>cctx_program = bytestr_to_program A_bytestr, cctx_this = 0x42, cctx_hash_filter = \<lambda>x. True\<rparr>"
+  by (simp add: build_cctx0_def update_world_def addrs accounts_def)
+
+lemma create_env_simp:
+ "create_env          (update_world accounts user
+                         (accounts user
+                          \<lparr>block_account_nonce := transaction_nonce + 1,
+                             block_account_balance := block_account_balance (accounts user) - 0x64000000\<rparr>)
+                         A_addr)
+                       (update_world
+                         (update_world accounts user
+                           (accounts user
+                            \<lparr>block_account_nonce := transaction_nonce + 1,
+                               block_account_balance := block_account_balance (accounts user) - 0x64000000\<rparr>))
+                         A_addr
+                         (update_world accounts user
+                           (accounts user
+                            \<lparr>block_account_nonce := transaction_nonce + 1,
+                               block_account_balance := block_account_balance (accounts user) - 0x64000000\<rparr>)
+                           A_addr))
+                       0 [] 16756216 user user 0x64 bi = \<lparr>vctx_stack = [], vctx_memory = empty_memory, vctx_memory_usage = 0,
+       vctx_storage = block_account_storage (accounts 0x42), vctx_pc = 0,
+       vctx_balance =
+         \<lambda>addr.
+            block_account_balance
+             (if addr = 0x42 then accounts 0x42
+              else update_world accounts 0x88
+                    (accounts 0x88
+                     \<lparr>block_account_nonce := transaction_nonce + 1,
+                        block_account_balance := block_account_balance (accounts 0x88) - 0x64000000\<rparr>)
+                    addr),
+       vctx_caller = 0x88, vctx_value_sent = 0, vctx_data_sent = [],
+       vctx_storage_at_call = block_account_storage (accounts 0x42),
+       vctx_balance_at_call =
+         \<lambda>addr.
+            block_account_balance
+             (if addr = 0x42 then accounts 0x42
+              else update_world accounts 0x88
+                    (accounts 0x88
+                     \<lparr>block_account_nonce := transaction_nonce + 1,
+                        block_account_balance := block_account_balance (accounts 0x88) - 0x64000000\<rparr>)
+                    addr),
+       vctx_origin = 0x88,
+       vctx_ext_program =
+         \<lambda>addr.
+            block_account_code
+             (if addr = 0x42 then accounts 0x42
+              else update_world accounts 0x88
+                    (accounts 0x88
+                     \<lparr>block_account_nonce := transaction_nonce + 1,
+                        block_account_balance := block_account_balance (accounts 0x88) - 0x64000000\<rparr>)
+                    addr),
+       vctx_block = bi, vctx_gas = 16756216,
+       vctx_account_existence =
+         \<lambda>addr.
+            (addr = 0x88 \<longrightarrow> block_account_exists (accounts 0x88)) \<and>
+            (addr \<noteq> 0x88 \<longrightarrow>
+             (addr = 0x42 \<longrightarrow> block_account_exists (accounts 0x42)) \<and>
+             (addr \<noteq> 0x42 \<longrightarrow> block_account_exists (accounts addr))),
+       vctx_touched_storage_index = [], vctx_logs = [], vctx_refund = 0, vctx_gasprice = 0x64\<rparr>"
+  by (clarsimp simp: create_env_def build_cctx0_def update_world_def addrs )
+
 lemma
   "uint (block_number bi) \<ge> homestead_block
-  \<Longrightarrow> start_transaction tr accounts bi = Continue  x
-  \<Longrightarrow> global_sem net x = Some v \<Longrightarrow>
-   P v"
+  \<Longrightarrow> start_transaction tr accounts bi = Continue x
+  \<Longrightarrow> global_sem net x = Some v
+  \<Longrightarrow> block_account_balance (f_state v user) = acc_bal"
   apply clarsimp
 
    apply (clarsimp simp: start_trans)
+  apply (thin_tac "x = _")
    apply (clarsimp simp: get_vctx_gas_def create_env_def)
   apply (clarsimp simp: calc_igas_def tr_gas_limit'_def)
-  apply (thin_tac "x = P" for P)
-  apply (simp add: global_step_def split: global_state.splits)
-  using A_calls_B_spec
+  apply (clarsimp simp: global_step_def build_cctx0_simp create_env_simp)
+  apply (clarsimp simp: envstep_def Let_def)
+
+  using A_calls_B_spec[simplified triple_sem_t_def]
 
   oops
 
