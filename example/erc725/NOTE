@@ -1,0 +1,5 @@
+sudo  docker build -t solc:v0 .
+sudo docker run -it --mount type=bind,source=/home/sid/dev/ethereum/seed/eth-isabelle/example/erc725,target=/home/app/erc725 solc:v0
+
+# inside docker
+solc --allow-paths /home/app/erc725/ --bin -o res --overwrite KeyHolderLibrary.sol
