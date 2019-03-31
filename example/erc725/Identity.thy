@@ -634,6 +634,14 @@ definition owner_hash :: "32 word"  where
 definition setData_hash :: "32 word"  where
  "setData_hash = 0x749ebfb8"
 
+lemma hash_diff:
+  "ucast (hash::32 word) = (0xa6f9dae1::w256) \<Longrightarrow> hash = 0xa6f9dae1 "
+  "ucast (hash::32 word) = (0x44c028fe::w256) \<Longrightarrow> hash = 0x44c028fe "
+  "ucast (hash::32 word) = (0x54f6127f::w256) \<Longrightarrow> hash = 0x54f6127f "
+  "ucast (hash::32 word) = (0x8da5cb5b::w256) \<Longrightarrow> hash = 0x8da5cb5b "
+  "ucast (hash::32 word) = (0x749ebfb8::w256) \<Longrightarrow> hash = 0x749ebfb8 "
+  by word_bitwise+
+
 context
 notes
   words_simps[simp add]
@@ -648,35 +656,6 @@ pure_false_simps[simp add] iszero_stack_def[simp add]
 word256FromNat_def[simp add]
 begin
 
-lemma address_mask:
- "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF = mask 160"
-  by (simp add: mask_def)
-
-lemma address_mask_ucast:
- "ucast (0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF && (ucast (w::address))::w256) = w"
-  apply (simp add: ucast_ucast_mask address_mask ucast_mask_drop word_bool_alg.conj.commute)
-  apply (simp add: mask_def)
-  done
-
-lemma ucast_and_w256_drop:
- "((ucast (w::address))::w256) && 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF = ucast w"
-  by word_bitwise
-
-definition
-  bytestr_to_w256 :: "byte list \<Rightarrow> w256"  where
- "bytestr_to_w256 \<equiv> word_rcat"
-
-lemma hash_diff:
-  "ucast (hash::32 word) = (0xa6f9dae1::w256) \<Longrightarrow> hash = 0xa6f9dae1 "
-  "ucast (hash::32 word) = (0x44c028fe::w256) \<Longrightarrow> hash = 0x44c028fe "
-  "ucast (hash::32 word) = (0x54f6127f::w256) \<Longrightarrow> hash = 0x54f6127f "
-  "ucast (hash::32 word) = (0x749ebfb8::w256) \<Longrightarrow> hash = 0x749ebfb8 "
-  by word_bitwise+
-
-lemma ucast_160_upto_256_eq:
-  " ((ucast (x::160 word))::w256) = ucast y \<Longrightarrow> x = y"
-  by (drule ucast_up_inj; simp)
-
 method sep_imp_solve2 uses simp =
    solves \<open>rule conjI; rule refl\<close>
  | solves \<open>match conclusion in "block_lookup _ _ = Some _"  \<Rightarrow> \<open>simp add:word_rcat_simps\<close>
@@ -686,89 +665,18 @@ method sep_imp_solve2 uses simp =
  | solves \<open>(clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|(clarsimp split:if_split simp: simp)|rule conjI)+)[1])\<close>
  | solves \<open>(clarsimp split:if_splits simp:word_rcat_simps) ; sep_imp_solve2 \<close>
 
-method split_conds =
- (split if_split_asm; clarsimp simp add: word_rcat_simps)?
-
 method block_vcg2 uses simp=
   split_conds,
   ((blocks_rule_vcg; (rule refl)?), triple_seq_vcg),
   (sep_imp_solve2 simp:simp)+,
   (solves \<open>split_conds\<close>)?
 
-definition w256 :: "'a::len0 word \<Rightarrow> w256"  where
- "w256 v \<equiv> ucast v"
-
-definition bytestr :: "'a::len0 word \<Rightarrow> byte list"  where
- "bytestr \<equiv> word_rsplit"
-
-type_synonym erc20_balances = "address \<rightharpoonup> w256"
-
-definition store_upd :: "address \<Rightarrow> (w256 \<Rightarrow> w256) \<Rightarrow> erc20_balances \<Rightarrow> erc20_balances"
-  where
- "store_upd addr upd m \<equiv> m(addr \<mapsto> upd (the (m addr)))"
-
-definition
- zero :: "address \<Rightarrow> erc20_balances \<Rightarrow> erc20_balances"
- where
- "zero addr m \<equiv> m(addr \<mapsto> 0)"
-
 definition
  store_mapping :: "address \<Rightarrow> w256"
  where
  "store_mapping addr \<equiv>  keccak (bytestr (w256 addr) @ bytestr (0::w256))"
 
-definition
- store_to_storage :: "erc20_balances \<Rightarrow> state_element set \<Rightarrow> bool"
- where
- "store_to_storage m s \<equiv> s = (\<lambda>addr. StorageElm (store_mapping addr, the (m addr))) ` dom m"
-
-(* lemma balances_to_storage_sep':
- "addrs_hash_consistency (dom m)
- \<Longrightarrow> m addr = Some v
- \<Longrightarrow>  balances_to_storage m = (storage (balances_mapping addr) v ** balances_to_storage (m(addr:=None)))"
-  apply (rule ext)
-  apply (rule iffI)
-   apply (clarsimp simp add: sep_basic_simps balances_to_storage_def storage_def)
-   apply (fastforce simp: balances_mapping_def addrs_hash_consistency_def image_def)
-  apply (clarsimp simp: balances_to_storage_def sep_basic_simps  split:if_splits)
-  apply (simp add: image_def storage_def)
-  apply (rule equalityI)
-   apply fastforce
-  apply fastforce
-  done
-
-lemma balances_to_storage_sep:
- "addrs_hash_consistency (insert addr (dom m))
- \<Longrightarrow> balances_to_storage (m(addr\<mapsto>v)) = (storage (balances_mapping addr) v ** balances_to_storage (m(addr:=None)))"
-  by (subst  balances_to_storage_sep'[where addr=addr and v=v]; simp)
-
-lemma balances_to_storage_singleton:
- "a1 \<noteq> a2
- \<Longrightarrow> balances_to_storage ([a1 \<mapsto> v](a2 := None)) = (storage (balances_mapping a1) v)"
-  apply (rule ext)
-  apply ( simp add: balances_to_storage_def storage_def image_def)
-  done
-
-lemma transfer_sep:
- "addrs_hash_consistency {a2,a1}
-  \<Longrightarrow> a1 \<noteq> a2
-  \<Longrightarrow> (balances_to_storage (transfer a1 a2 v1 ([a1\<mapsto>v1, a2\<mapsto>v2])) ** R) = (storage (balances_mapping a2) (v2 + v1) \<and>* storage (balances_mapping a1) 0 \<and>* R)"
-  apply (simp add: transfer_def balance_upd_def)
-  apply (sep_simp simp: balances_to_storage_sep)
-  apply simp
-  apply (sep_simp simp: balances_to_storage_sep)
-  apply (simp add: sep_conj_assoc sep_conj_commute)
-  apply (sep_simp simp: balances_to_storage_singleton)
-  apply (simp)+
-  done
-
-definition requires_cond
-  where
- "requires_cond to val balance_frm balance_to \<equiv>
-  to \<noteq> 0 \<and>  val \<le> balance_frm"
-
- *)
-method fast_sep_imp_solve uses simp = 
+method fast_sep_imp_solve uses simp =
   (match conclusion  in "triple_blocks _ _ _ _ _"  \<Rightarrow> \<open>succeed\<close> | 
     ( sep_imp_solve2 simp:simp, fast_sep_imp_solve simp: simp) )
 
@@ -780,6 +688,10 @@ method triple_blocks_vcg =
 
 abbreviation (input) owner_addr :: w256  where
   "owner_addr \<equiv> 0x1"
+
+lemma word_or_one_neq_zero[simp]:
+ "(a::'a::len word) || 1 \<noteq> 0"
+  by (simp add: word_or_zero)
 
 theorem verify_identity_return:
 notes
@@ -802,12 +714,16 @@ shows
    sent_data (bytestr hash @ xs) **
    sent_value 0 ** caller sender ** blk_num bn **
    memory_usage 0 ** continuing ** gas_pred 100000 **
+   account_existence sender sender_ex  **
    storage owner_addr owner **
    storage addr val **
    memory (0x00::w256) m0x0 **
    memory (0x20::w256) m0x20 **
    memory (0x40::w256) (bytestr_to_w256 [x]) **
    memory (0x60::w256) (bytestr_to_w256 [y]) **
+   memory (0x80::w256) m0x80 **
+   memory (0xA0::w256) m0xA0 **
+   memory (0xA1::w256) m0xA1 **
    log_number log_num **
    this_account this)
   blocks_identity
@@ -1000,8 +916,182 @@ shows
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
-           apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+   apply split_conds
+   apply split_conds
+   apply split_conds
+          apply split_conds
+          apply (subst (asm) Let_def)+
+   apply split_conds
+  apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+   apply split_conds
+  apply (simp add: word_rcat_simps)
+   apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2 simp: word_rcat_simps)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+   apply split_conds
+   apply split_conds
+            apply split_conds
+            apply (subst (asm)  word_bool_alg.conj.commute)
+            apply (subst (asm) word_bool_alg.conj.assoc)
+            apply simp
+  apply (subst (asm ) ucast_and_w256_drop[symmetric])
+  apply simp
+  \<comment>\<open>The above lines is probably not be necessary\<close>
+   apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+   apply (simp add: word_rcat_simps)
+   apply split_conds
+   apply split_conds
+   apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+   apply (simp add: word_rcat_simps)
+   apply split_conds
+   apply split_conds
+   apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+              apply (sep_imp_solve2)
+   apply split_conds
+   apply split_conds
+   apply (triple_blocks_vcg)
 
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+   apply (simp add: word_rcat_simps)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+   apply (simp add: word_rcat_simps)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+   apply (simp add: word_rcat_simps)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (simp add: word_rcat_simps)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+             apply (triple_blocks_vcg)
   oops
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
@@ -1015,6 +1105,66 @@ shows
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+  oops
+    apply (simp add: word_rcat_simps)
+    apply (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:|rule conjI)+)[1])
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+  oops
+  apply (subst (asm ) ucast_and_w256_drop)
+  find_theorems mask name:Dispa
+  find_theorems "UCAST(_ \<rightarrow> _) _" name:Disp 
+  apply (simp add: ucast_and_w256_drop)
+   apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+  oops
+    apply (clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:simp|rule conjI)+)[1])
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+   apply split_conds
+   apply split_conds
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+  oops
+  apply (rule refl)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+
+  oops
 
    apply split_conds
    apply split_conds

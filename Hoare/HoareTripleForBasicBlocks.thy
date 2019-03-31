@@ -415,6 +415,20 @@ inductive triple_inst_memory :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred 
       (program_counter (n + 1) \<and>* stack_height h \<and>* memory memaddr v \<and>*
        gas_pred (g - Gverylow + Cmem memu - Cmem (M memu memaddr 32)) \<and>*
        memory_usage (M memu memaddr 32) \<and>* continuing \<and>* rest)"
+ |  inst_calldatacopy:
+    "triple_inst_memory
+      (\<langle> h \<le> 1020 \<and> Gbase \<le> g\<rangle> \<and>*
+       continuing \<and>* program_counter n \<and>*
+       stack h mem_offs \<and>*  stack (Suc h) in_offs \<and>*
+       stack (Suc (Suc h)) len \<and>*
+       stack_height (Suc (Suc (Suc h))) \<and>* sent_data data \<and>*
+       gas_pred g \<and>* rest)
+      (n, Memory CALLDATACOPY)
+      (program_counter (n + 1) \<and>*
+       continuing \<and>* sent_data data \<and>*
+       memory_range mem_offs (take (unat len) (drop (unat in_offs) data)) \<and>*
+       stack_height h \<and>* gas_pred (g - Gbase) \<and>*
+       rest)"
 
 inductive triple_inst_storage :: "network \<Rightarrow> pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
  inst_sload :
