@@ -377,6 +377,18 @@ inductive triple_inst_misc :: "network \<Rightarrow> pred \<Rightarrow> pos_inst
                                                       callarg_output_size = out_size\<rparr>) \<and>*
      gas_pred (g - Ccallgas g' r value (\<not>existence) g net (calc_memu_extra m g' r value in_begin in_size out_begin out_size)) \<and>* 
      memory_usage m \<and>* memory_range in_begin in_data \<and>* rest)"
+| inst_create :
+    "triple_inst_misc net
+    (\<langle> h \<le> 1020 \<and> Gcreate \<le> g \<and> at_least_eip150 net \<and>
+       length code_data = unat len \<rangle> \<and>*
+     continuing \<and>* program_counter n \<and>* gas_pred g \<and>*
+     stack_topmost h [value, code_mem_offs, len] \<and>* memory_usage m \<and>*
+     memory_range code_mem_offs code_data \<and>* rest)
+    (n, Misc CREATE)
+    (stack_topmost h [] \<and>* not_continuing \<and>*
+     program_counter (n + 1) \<and>* action (ContractCreate \<lparr> createarg_value = value, createarg_code = code_data \<rparr>) \<and>*
+     gas_pred (g - Gcreate) \<and>* 
+     memory_usage m \<and>* memory_range code_mem_offs code_data \<and>* rest)"
 
 definition memory :: "w256 \<Rightarrow> w256 \<Rightarrow> state_element set_pred" where
 "memory ind w = memory_range ind (word_rsplit w)"

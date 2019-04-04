@@ -831,6 +831,29 @@ lemma two_memory_memory_range_eq:
  "(R' \<and>* memory 0x20 w2 \<and>* R  \<and>* memory 0 w1  \<and>* R'') = (memory_range 0 (word_rsplit w1 @ word_rsplit w2) \<and>* R' \<and>* R  \<and>* R'')"
   by (simp add: memory_def, simp add: ac_simps, sep_simp simp: memory_range_0_w256_append)
 
+lemma  stack_topmost3_unfold_sep:
+  "(stack_topmost h [a, b, c] ** R)
+  = (stack_height (Suc (Suc (Suc h))) ** stack h a ** stack (Suc h) b  ** stack (Suc (Suc h)) c ** R)"
+  apply (unfold stack_topmost_def)
+  apply clarsimp
+  apply (rule ext)
+  apply (rule iffI)
+  apply (clarsimp simp add: sep_basic_simps stack_def stack_height_def )
+  apply (rule_tac x="insert (StackElm (Suc (Suc h), c))
+                     (insert (StackElm (Suc h, b)) (insert (StackElm (h, a)) y))" in exI)
+  apply clarsimp
+  apply (rule_tac x="{StackElm (Suc (Suc h), c), StackElm (Suc h, b)} \<union> y" in exI)
+   apply clarsimp
+   apply (rule conjI)
+    apply blast
+  apply (rule_tac x="{ StackElm (Suc (Suc h), c)} \<union> y" in exI)
+   apply clarsimp
+   apply blast  
+  apply (clarsimp simp add: sep_basic_simps stack_def stack_height_def )
+  apply (rename_tac y, drule_tac x=y in spec)
+  apply blast
+  done
+
 lemma  stack_topmost_unfold_sep:
   "(stack_topmost h [a, b, c, d, e] ** R)
   = (stack_height (Suc (Suc (Suc (Suc (Suc h))))) ** stack h a ** stack (Suc h) b  ** stack (Suc (Suc h)) c** stack (Suc (Suc (Suc h))) d  
