@@ -702,23 +702,21 @@ definition
 where
  "input_data hash op_type to xs \<equiv> bytestr hash @ (if hash = execute_hash then bytestr op_type @ bytestr (w256 to) @ xs else xs)"
 
-lemma input_data_length_ge_4:
- "length xs < 2 ^ 64 \<Longrightarrow> word_of_int (int (length (input_data hash op_type to xs))) \<ge> (4::w256)"
-  apply (case_tac " hash = execute_hash"; clarsimp simp: input_data_def len_bytestr_simps wi_hom_syms)
-  sorry
-
 lemma input_data_extract_hash:
  "input_data hash op_type to xs = bytestr hash @ drop 4 (input_data hash op_type to xs)"
   by (simp add: input_data_def len_bytestr_simps)
 
-lemma
- "(word_of_int
+lemma input_data_manip_is_hash:
+ "length (input_data hash op_type to xs) \<ge> 4 \<Longrightarrow>
+word_of_int
      (uint
        (word_rcat
          (if 32 \<le> length (input_data hash op_type to xs) then take 32 (input_data hash op_type to xs)
           else let filling_len = 32 - length (take 32 (input_data hash op_type to xs))
-               in take 32 (input_data hash op_type to xs) @ replicate filling_len 0) div
-      (0x100000000000000000000000000000000000000000000000000000000:: w256)))::w256) = ucast hash"
+               in take 32 (input_data hash op_type to xs) @ replicate filling_len 0) :: w256) div
+      0x100000000000000000000000000000000000000000000000000000000) =
+    UCAST(32 \<rightarrow> 256) hash"
+  apply (subst  uint_div[where y="0x100000000000000000000000000000000000000000000000000000000::w256", symmetric, simplified])
   apply (clarsimp split: if_splits)
   apply (rule conjI; clarsimp)
    apply (subst input_data_extract_hash)
@@ -727,9 +725,13 @@ lemma
    apply (subst  word_rcat_word_rsplit_div_rep0)
     apply simp
    apply (simp add: word_rcat_rsplit_ucast)
-  
-  
-  oops
+  apply (subst input_data_extract_hash)
+  apply simp
+  apply (simp add: bytestr_def)
+  apply ( subst  word_rcat_word_rsplit_div_rep0)
+   apply simp
+  apply (rule word_rcat_rsplit_ucast)
+  done
 
 theorem verify_identity_return:
   notes
@@ -809,19 +811,192 @@ shows
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
-   apply (simp add: word_rcat_simps)
+  apply_trace \<open>"word_of_int"\<close> (simp add: word_rcat_simps)
   apply split_conds
    apply split_conds
-  using [[show_types]]
-  apply split_conds
-   apply split_conds
-  using dispatcher_hash_extract
-  apply (triple_blocks_vcg)
 
+   apply (subst (asm) input_data_manip_is_hash)
+  apply (subst input_data_extract_hash)
+    apply simp
+  apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
   apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2 simp: word_rcat_simps)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+  apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+   apply split_conds
+   apply split_conds
+      apply split_conds
+   apply split_conds
+   apply split_conds
+  apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+        apply split_conds
+   apply split_conds
+
+  apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+          apply (sep_imp_solve2)
+   apply split_conds
+   apply split_conds
+         apply split_conds
+  apply (subst (asm) input_data_extract_hash, fastforce) 
+   apply split_conds
+   apply split_conds
+   apply split_conds
+   apply split_conds
+  apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+  apply (triple_blocks_vcg)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
+    apply (sep_imp_solve2)
    apply split_conds
     apply (sep_imp_solve2)
    apply split_conds
