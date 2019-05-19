@@ -1242,7 +1242,10 @@ assumes blk_num: "bn > 2463000"
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
             apply (subst stack_topmost_unfold_sep')
-   apply (clarsimp simp:  word_rcat_simps )
+  apply (drule ucast_sym)
+  using len_input_data_execute_hash[of op_type to xs, simplified execute_hash_def]
+  using ucast_to_input_data[of op_type to xs, simplified execute_hash_def]
+  apply (clarsimp simp:  word_rcat_simps )
   apply (clarsimp?, order_sep_conj)
               apply (((sep_cancel, clarsimp?)+)|simp add:|rule conjI)
   apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0"])?))
@@ -1255,8 +1258,25 @@ assumes blk_num: "bn > 2463000"
   apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0"])?))
              apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0"])?))
    apply split_conds
+    apply (sep_imp_solve2)
+  apply (rule conjI)
+  apply clarsimp
+  apply (rule conjI)
+  using len_input_data_execute_hash[of op_type to xs, simplified execute_hash_def]
+  apply (clarsimp split: if_split simp: word_rcat_simps)
+  apply (rule conjI)
+  apply clarsimp
+  apply (rule conjI)
+  apply clarsimp
+  apply (rule conjI)
+  apply (clarsimp simp: Ccallgas_def)
 
-  using ucast_to_input_data
+  apply (drule ucast_sym)
+  using ucast_to_input_data[of op_type to xs, simplified execute_hash_def]
+  apply clarsimp
+    apply (sep_imp_solve2)
+  oops
+  using ucast_to_input_data[simplified execute_hash_def]
   find_theorems execute_hash input_data
   apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0"])?))
   apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0"])?))
