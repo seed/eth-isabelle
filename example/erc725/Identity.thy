@@ -697,10 +697,23 @@ lemma memory_range_Nil:
  "(memory_range addr xs ** R) = (memory_range addr [] ** memory_range addr xs ** R)"
   by (case_tac xs; clarsimp simp: memory_range.simps)
 
+lemma memory_range_w256_split_4_24:
+ "(memory_range addr [b1,b2,b3,b4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0] ** R) =
+  (memory_range addr [b1,b2,b3,b4] ** memory_range (addr+4) (replicate 28 (0::byte)) ** R)"
+  by (simp add: memory_range.simps add.commute)
+
+lemma rep28_eq_wrsplit:
+ "replicate 28 (0::byte) = word_rsplit (0::224 word)"
+  by (simp add:word_rsplit_def bin_rsplit_def bin_cat_def)
+
+lemmas memory_range_w256_split_4_24_wrsplit =
+  memory_range_w256_split_4_24[simplified rep28_eq_wrsplit]
+
 definition
   input_data :: "32 word \<Rightarrow> w256 \<Rightarrow> address \<Rightarrow> byte list \<Rightarrow> byte list" 
 where
- "input_data hash op_type to xs \<equiv> bytestr hash @ (if hash = execute_hash then bytestr op_type @ bytestr (w256 to) @ xs else xs)"
+ "input_data hash op_type to xs \<equiv> bytestr hash @ (if hash = execute_hash then bytestr op_type @ bytestr (w256 to) @ bytestr ((of_nat (length xs)) :: w256)  @ xs else xs)"
 
 lemma input_data_extract_hash:
  "input_data hash op_type to xs = bytestr hash @ drop 4 (input_data hash op_type to xs)"
@@ -1258,7 +1271,9 @@ assumes blk_num: "bn > 2463000"
   apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0"])?))
              apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0"])?))
    apply split_conds
-    apply (sep_imp_solve2)
+   apply (subst (asm) memory_range_Nil[where addr="0xA0"])
+             apply (sep_imp_solve2)
+
   apply (rule conjI)
   apply clarsimp
   apply (rule conjI)
@@ -1268,9 +1283,94 @@ assumes blk_num: "bn > 2463000"
   apply clarsimp
   apply (rule conjI)
   apply clarsimp
-  apply (rule conjI)
-  apply (clarsimp simp: Ccallgas_def)
+  apply (clarsimp simp: Ccallgas_def )
+  apply (split if_split |   (rule conjI))+
+               apply (rule conjI|clarsimp)+
+  apply (simp add: L_def calc_memu_extra_def)
+  apply (simp add: L_def calc_memu_extra_def)
+  apply (simp add: L_def calc_memu_extra_def)
+  apply (simp add: L_def calc_memu_extra_def)
+               apply (rule conjI|clarsimp)+
+  apply (simp add: L_def calc_memu_extra_def Ccallgas_def)
+  apply (split if_split |   (rule conjI))+
+  apply (simp add: L_def calc_memu_extra_def Ccallgas_def)
+  apply (simp add: L_def calc_memu_extra_def Ccallgas_def)
+  apply (simp add: L_def calc_memu_extra_def Ccallgas_def)
+  apply (sep_imp_solve2)
+   apply split_conds
+   apply split_conds
+   apply split_conds
 
+  apply (triple_blocks_vcg)
+  apply (sep_imp_solve2)
+  apply (simp add: word_rcat_simps)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (clarsimp simp:  word_rcat_simps )
+  apply (clarsimp?, order_sep_conj)
+              apply (((sep_cancel, clarsimp?)+)|simp add:|rule conjI)
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply (subst (asm) memory_range_w256_split_4_24)
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"] memory_def[ where ind="0x84"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"] memory_def[ where ind="0x84"])?))
+   apply (subst (asm) memory_range_Nil[where addr="0x84"])
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"] memory_def[ where ind="0x84"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"] memory_def[ where ind="0x84"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"] memory_def[ where ind="0x84"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"] memory_def[ where ind="0x84"])?))
+  apply (sep_imp_solve2)
+  oops
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (clarsimp?, order_sep_conj)
+              apply (((sep_cancel, clarsimp?)+)|simp add:|rule conjI)
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  find_theorems "memory_range" Cons
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+  oops
   apply (drule ucast_sym)
   using ucast_to_input_data[of op_type to xs, simplified execute_hash_def]
   apply clarsimp
