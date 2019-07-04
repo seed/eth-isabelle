@@ -821,7 +821,7 @@ assumes blk_num: "bn > 2463000"
    memory_range 0xA0 (word_rsplit (wdata_sz::w256)) **
    memory_range 0xA1 (word_rsplit (wdata::w256)) **
    memory (0xA0 + word_rcat (take 32 (drop (unat (4 + word_rcat (take 32 xs)))
-     (input_data execute_hash op_type to xs)))) m0xa0_plus **
+     (input_data execute_hash op_type to xs)))) (m0xa0_plus::w256) **
    memory 0xA4 m0xA4 **
    memory 0xC4 m0xC4 **
    log_number log_num **
@@ -2117,17 +2117,18 @@ assumes blk_num: "bn > 2463000"
   apply (sep_imp_solve2)
   apply split_conds
                       apply (drule ucast_sym)
-  apply (simp add: drop_100_input_data[unfolded execute_hash_def])
+  apply (simp add: drop_100_input_data[unfolded execute_hash_def] execute_hash_def)
   apply (clarsimp?, order_sep_conj)
               apply (((sep_cancel, clarsimp?)+)|simp add:|rule conjI)
-                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
-                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
-                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
-                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
-                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
-                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
-                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
-                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0 + _"])?))
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0 + _"])?))
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0 + _"])?))
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0 + _"])?))
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0 + _"])?))
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0 + _"])?))
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0 + _"])?))
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0 + _"])?))
+  using [[show_types]]
   oops
 
   find_theorems input_data drop
