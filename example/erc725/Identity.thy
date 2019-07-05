@@ -716,16 +716,16 @@ lemmas memory_range_w256_split_4_24_wrsplit =
   memory_range_w256_split_4_24[simplified rep28_eq_wrsplit]
 
 definition
-  input_data :: "32 word \<Rightarrow> w256 \<Rightarrow> address \<Rightarrow> byte list \<Rightarrow> byte list" 
+  input_data :: "32 word \<Rightarrow> w256 \<Rightarrow> address \<Rightarrow> w256 \<Rightarrow> byte list \<Rightarrow> byte list" 
 where
- "input_data hash op_type to xs \<equiv> bytestr hash @ (if hash = execute_hash then bytestr op_type @ bytestr (w256 to) @ bytestr ((of_nat (length xs)) :: w256)  @ xs else xs)"
+ "input_data hash op_type to v xs \<equiv> bytestr hash @ (if hash = execute_hash then bytestr op_type @ bytestr (w256 to) @ bytestr v @ bytestr ((of_nat (length xs)) :: w256)  @ xs else xs)"
 
 lemma input_data_extract_hash:
- "input_data hash op_type to xs = bytestr hash @ drop 4 (input_data hash op_type to xs)"
+ "input_data hash op_type to v xs = bytestr hash @ drop 4 (input_data hash op_type to v xs)"
   by (simp add: input_data_def len_bytestr_simps)
 
 lemma length_input_data_ge_4[simp]:
- "length (input_data hash op_type to xs) \<ge> 4"
+ "length (input_data hash op_type to v xs) \<ge> 4"
   by (subst input_data_extract_hash)
      (simp add: len_bytestr_simps)
 
@@ -735,12 +735,12 @@ lemma ucast_sym:
      (simp add: is_up ucast_up_ucast_id)
 
 lemma len_input_data_execute_hash:
- "length (input_data execute_hash op_type to xs) \<ge> 68"
+ "length (input_data execute_hash op_type to v xs) \<ge> 132"
   by (simp add: input_data_def len_bytestr_simps)
 
 lemma ucast_to_input_data:
  "UCAST(256 \<rightarrow> 160) (word_rcat (take 32 
-    (drop 36 (input_data execute_hash op_type to xs)))
+    (drop 36 (input_data execute_hash op_type to v xs)))
      && 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) = to"
   apply(clarsimp simp: execute_hash_def input_data_def word_rcat_simps len_bytestr_simps)
   apply (clarsimp simp: bytestr_def)
@@ -755,9 +755,9 @@ lemma input_data_manip_is_hash:
   "word_of_int
      (uint
        (word_rcat
-         (if 32 \<le> length (input_data hash op_type to xs) then take 32 (input_data hash op_type to xs)
-          else let filling_len = 32 - length (take 32 (input_data hash op_type to xs))
-               in take 32 (input_data hash op_type to xs) @ replicate filling_len 0) :: w256) div
+         (if 32 \<le> length (input_data hash op_type to v xs) then take 32 (input_data hash op_type to v xs)
+          else let filling_len = 32 - length (take 32 (input_data hash op_type to v xs))
+               in take 32 (input_data hash op_type to v xs) @ replicate filling_len 0) :: w256) div
       0x100000000000000000000000000000000000000000000000000000000) =
     UCAST(32 \<rightarrow> 256) hash"
   apply (subst  uint_div[where y="0x100000000000000000000000000000000000000000000000000000000::w256", symmetric, simplified])
@@ -778,9 +778,8 @@ lemma input_data_manip_is_hash:
   done
 
 lemma drop_100_input_data[simp]:
- "drop 100 (input_data execute_hash op_type to xs) = xs"
+ "drop 100 (input_data execute_hash op_type to v xs) = bytestr (of_nat (length xs)::w256) @ xs"
   by (simp add: input_data_def len_bytestr_simps)
-
 
 theorem verify_identity_return:
   notes
@@ -799,12 +798,12 @@ fixes hash::"32 word"
 assumes blk_num: "bn > 2463000"
     and net: "at_least_eip150 net"
     and xs: "length xs < 2^64"
-    and woi_input_data_ge_4: "word_of_int (int (length (input_data hash op_type to xs))) \<ge> (4::w256)"
+    and woi_input_data_ge_4: "word_of_int (int (length (input_data hash op_type to v xs))) \<ge> (4::w256)"
   shows
 "\<exists>r. bbtriple net
   (\<langle>ucast owner \<noteq> sender \<and> addr \<noteq> 1\<rangle> **
    program_counter 0 ** stack_height 0 **
-   sent_data (input_data hash op_type to xs) **
+   sent_data (input_data hash op_type to v xs) **
    sent_value 0 ** caller sender ** blk_num bn **
    memory_usage 0 ** continuing ** gas_pred 100000 **
    account_existence to to_ex  **
@@ -820,8 +819,8 @@ assumes blk_num: "bn > 2463000"
    memory_range 0x84 (word_rsplit (m0x84::w256)) **
    memory_range 0xA0 (word_rsplit (wdata_sz::w256)) **
    memory_range 0xA1 (word_rsplit (wdata::w256)) **
-   memory (0xA0 + word_rcat (take 32 (drop (unat (4 + word_rcat (take 32 xs)))
-     (input_data execute_hash op_type to xs)))) (m0xa0_plus::w256) **
+   memory (0xA0 + word_rcat (take 32 (drop (unat ((4::w256) + word_rcat (take 32 xs)))
+     (input_data execute_hash op_type to v xs)))) (m0xa0_plus::w256) **
    memory 0xA4 m0xA4 **
    memory 0xC4 m0xC4 **
    log_number log_num **
@@ -1280,11 +1279,14 @@ assumes blk_num: "bn > 2463000"
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
-            apply (subst stack_topmost_unfold_sep')
+    apply (subst stack_topmost_unfold_sep')
   apply (drule ucast_sym)
-  using len_input_data_execute_hash[of op_type to xs, simplified execute_hash_def]
-  using ucast_to_input_data[of op_type to xs, simplified execute_hash_def]
-  apply (clarsimp simp:  word_rcat_simps )
+  using len_input_data_execute_hash[of op_type to v xs, simplified execute_hash_def]
+  using ucast_to_input_data[of op_type to v xs, simplified execute_hash_def]
+            apply (clarsimp simp:  word_rcat_simps )
+  using len_input_data_execute_hash[of op_type to v xs, simplified execute_hash_def]
+  using ucast_to_input_data[of op_type to v xs, simplified execute_hash_def]
+            apply (clarsimp simp:  word_rcat_simps )
   apply (clarsimp?, order_sep_conj)
               apply (((sep_cancel, clarsimp?)+)|simp add:|rule conjI)
   apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0"])?))
@@ -2128,8 +2130,34 @@ assumes blk_num: "bn > 2463000"
                       apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0 + _"])?))
                       apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0 + _"])?))
                       apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0xA0 + _"])?))
-  using [[show_types]]
+  apply (rule conjI)
+                      apply (subst max_absorb2)
   oops
+
+lemma
+ "(63 + uint (0xA0 + word_rcat (take 32 (drop (unat (4 + word_rcat (take 32 xs))) 
+   (input_data 0x44C028FE op_type to xs))))) div 32 = undefined"
+  apply (simp add: input_data_def len_bytestr_simps)
+  apply (simp add: execute_hash_def len_bytestr_simps)
+  apply ()
+  apply (subgoal_tac "\<exists>v::w256. word_rcat (take 32 xs) = v")
+  apply (erule exE)
+  oops
+
+[(908, Stack (PUSH_N [0])), (910, Stack (PUSH_N [3, 0xDA])), (913, Dup 3), (914, Dup 3),
+            (915, Dup 0), (916, Dup 0), (917, Stack (PUSH_N [0x1F])), (919, Arith ADD),
+            (920, Stack (PUSH_N [0x20])), (922, Dup 0), (923, Swap 1), (924, Arith DIV), (925, Arith MUL),
+            (926, Stack (PUSH_N [0x20])), (928, Arith ADD), (929, Stack (PUSH_N [0x40])),
+            (931, Memory MLOAD), (932, Swap 0), (933, Dup 1), (934, Arith ADD), (935, Stack (PUSH_N [0x40])),
+            (937, Memory MSTORE), (938, Dup 0), (939, Swap 3), (940, Swap 2), (941, Swap 1), (942, Swap 0),
+            (943, Dup 1), (944, Dup 1), (945, Memory MSTORE), (946, Stack (PUSH_N [0x20])), (948, Arith ADD),
+            (949, Dup 3), (950, Dup 3), (951, Dup 0), (952, Dup 2), (953, Dup 4), (954, Memory CALLDATACOPY),
+            (955, Stack (PUSH_N [0])), (957, Dup 1), (958, Dup 4), (959, Arith ADD), (960, Memory MSTORE),
+            (961, Stack (PUSH_N [0x1F])), (963, Bits inst_NOT), (964, Stack (PUSH_N [0x1F])), (966, Dup 2),
+            (967, Arith ADD), (968, Bits inst_AND), (969, Swap 0), (970, Stack POP), (971, Dup 0),
+            (972, Dup 3), (973, Arith ADD), (974, Swap 2), (975, Stack POP), (976, Stack POP),
+            (977, Stack POP), (978, Stack POP), (979, Stack POP), (980, Stack POP), (981, Stack POP),
+            (982, Stack (PUSH_N [7, 8]))],
 
   find_theorems input_data drop
                       apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))
