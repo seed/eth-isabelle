@@ -761,6 +761,10 @@ lemma to_input_data_ucast:
   apply (simp)
   done
 
+lemma v_in_input_data:
+ "word_rcat (take 32 (drop 68 (input_data execute_hash op_type to v xs))) = v"
+  by (clarsimp simp: execute_hash_def input_data_def word_rcat_simps len_bytestr_simps bytestr_def word_rcat_rsplit)
+
 lemma input_data_manip_is_hash:
   "word_of_int
      (uint
@@ -2307,11 +2311,6 @@ assumes blk_num: "bn > 2463000"
   using [[show_types]] ucast_to_input_data[simplified execute_hash_def]
   apply -
   oops
-
-lemma v_in_input_data:
- "word_rcat (take 32 (drop 68 (input_data execute_hash op_type to v xs))) = v"
-  by (clarsimp simp: execute_hash_def input_data_def word_rcat_simps len_bytestr_simps bytestr_def word_rcat_rsplit)
-  
 
 
 end
