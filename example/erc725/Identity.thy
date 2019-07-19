@@ -738,7 +738,7 @@ lemma len_input_data_execute_hash:
  "length (input_data execute_hash op_type to v xs) \<ge> 132"
   by (simp add: input_data_def len_bytestr_simps)
 
-lemma ucast_to_input_data:
+lemma ucast_to_input_data[simplified execute_hash_def, simp]:
  "UCAST(256 \<rightarrow> 160) (word_rcat (take 32 
     (drop 36 (input_data execute_hash op_type to v xs)))
      && 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) = to"
@@ -750,7 +750,7 @@ lemma ucast_to_input_data:
   apply (simp add: ucast_up_ucast_id is_up)
   done
 
-lemma to_input_data_ucast:
+lemma to_input_data_ucast[simplified execute_hash_def, simp]:
  "word_rcat (take 32 (drop 36 (input_data execute_hash op_type to v xs))) &&
            (0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF::w256) = UCAST(160\<rightarrow>256) to"
   apply(clarsimp simp: execute_hash_def input_data_def word_rcat_simps len_bytestr_simps)
@@ -760,10 +760,6 @@ lemma to_input_data_ucast:
   apply (subst ucast_and_w256_drop)
   apply (simp)
   done
-
-lemma v_in_input_data:
- "word_rcat (take 32 (drop 68 (input_data execute_hash op_type to v xs))) = v"
-  by (clarsimp simp: execute_hash_def input_data_def word_rcat_simps len_bytestr_simps bytestr_def word_rcat_rsplit)
 
 lemma input_data_manip_is_hash:
   "word_of_int
@@ -791,9 +787,40 @@ lemma input_data_manip_is_hash:
   apply (rule word_rcat_rsplit_ucast)
   done
 
-lemma drop_100_input_data[simp]:
+lemma drop_100_input_data[simplified execute_hash_def]:
  "drop 100 (input_data execute_hash op_type to v xs) = bytestr (of_nat (length xs)::w256) @ xs"
   by (simp add: input_data_def len_bytestr_simps)
+
+lemma len_xs_of_input_data[simplified execute_hash_def, simp]:
+ "(word_rcat (take 32 (drop 100 (input_data execute_hash op_type to v xs)))::w256) = of_nat (length xs)"
+  by (simp add: execute_hash_def input_data_def  bytestr_def word_rcat_rsplit)
+
+lemma op_type_of_input_data[simplified execute_hash_def, simp]:
+ "word_rcat (take 32 (drop 4 (input_data execute_hash op_type to v xs))) = op_type"
+  by (simp add: input_data_def execute_hash_def   bytestr_def word_rcat_rsplit)
+
+
+lemma to_of_input_data[simplified execute_hash_def, simp]:
+ "word_rcat (take 32 (drop 36 (input_data execute_hash op_type to v xs))) = UCAST(160\<rightarrow>256) to"
+  by (simp add: input_data_def execute_hash_def   bytestr_def word_rcat_rsplit w256_def)
+
+lemma v_in_input_data[simplified execute_hash_def, simp]:
+ "word_rcat (take 32 (drop 68 (input_data execute_hash op_type to v xs))) = v"
+  by (clarsimp simp: execute_hash_def input_data_def word_rcat_simps len_bytestr_simps bytestr_def word_rcat_rsplit)
+
+lemma length_input_data_cond[simplified execute_hash_def]:
+ "length xs \<le> 0x100000000 \<Longrightarrow>
+  length (input_data execute_hash op_type to v xs) > unat ((4::w256) + word_rcat (take 32 (drop 100 (input_data execute_hash op_type to v xs))))"
+  apply (simp add: input_data_def len_bytestr_simps bytestr_def word_rcat_rsplit execute_hash_def)
+  apply (simp add: unat_ucast_less_no_overflow_simp  word_add_less_mono1 le_unat_uoi[where z="2^64"])+
+  done
+
+lemma length_input_data_gt_len_xs[simplified execute_hash_def, simp]:
+ "length xs \<le> 0x100000000 \<Longrightarrow>
+  length (input_data execute_hash op_type to v xs) > unat ((4::w256) + of_nat (length xs))"
+  apply (simp add: execute_hash_def input_data_def len_bytestr_simps)
+  apply (simp add: unat_ucast_less_no_overflow_simp  word_add_less_mono1 le_unat_uoi[where z="2^64"])
+  done
 
 theorem verify_identity_return:
   notes
@@ -805,14 +832,14 @@ theorem verify_identity_return:
   ucast_160_upto_256_eq[simp]
   hash_diff[simp]
   eval_bit_mask[simp]
-len_bytestr_simps[simp]
+  len_bytestr_simps[simp]
 fixes hash::"32 word"
   and op_type::"w256"
   and to ::"address"
 assumes blk_num: "bn > 2463000"
     and net: "at_least_eip150 net"
-    and xs: "length xs < 2^64"
     and woi_input_data_ge_4: "word_of_int (int (length (input_data hash op_type to v xs))) \<ge> (4::w256)"
+    and xs: "length xs \<le> 0x100000000" 
   shows
 "\<exists>r. bbtriple net
   (\<langle>ucast owner \<noteq> sender \<and> addr \<noteq> 1\<rangle> **
@@ -833,9 +860,7 @@ assumes blk_num: "bn > 2463000"
    memory_range 0x84 (word_rsplit (m0x84::w256)) **
    memory_range 0xA0 (word_rsplit (wdata_sz::w256)) **
    memory_range 0xA1 (word_rsplit (wdata::w256)) **
-(*    memory (0xA0 + word_rcat (take 32 (drop (unat ((4::w256) + word_rcat (take 32 xs)))
-     (input_data execute_hash op_type to v xs)))) (m0xa0_plus::w256) **
- *)   memory 0xA4 m0xA4 **
+   memory 0xA4 m0xA4 **
    memory 0xC4 m0xC4 **
    log_number log_num **
    this_account this)
@@ -972,37 +997,14 @@ assumes blk_num: "bn > 2463000"
    apply split_conds
    apply split_conds
       apply split_conds
-  apply (triple_blocks_vcg)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
+       apply (drule ucast_sym)
+  apply simp
+  using len_input_data_execute_hash[simplified execute_hash_def, of op_type to v xs]
+       apply fastforce
+  apply (drule ucast_sym)
         apply split_conds
    apply split_conds
-
-  apply (triple_blocks_vcg)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
+    apply (triple_blocks_vcg)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
@@ -1021,28 +1023,6 @@ assumes blk_num: "bn > 2463000"
     apply (sep_imp_solve2)
    apply split_conds
    apply split_conds
-  apply split_conds
-  apply (subst (asm) input_data_extract_hash, fastforce) 
-   apply split_conds
-   apply split_conds
-   apply split_conds
-  apply (triple_blocks_vcg)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
   apply (triple_blocks_vcg)
     apply (sep_imp_solve2 simp: word_rcat_simps)
     apply (sep_imp_solve2)
@@ -1070,10 +1050,13 @@ assumes blk_num: "bn > 2463000"
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
-    apply (sep_imp_solve2)
    apply split_conds
    apply split_conds
-   apply split_conds
+         apply split_conds
+(* HERE *)
+          apply (simp add: input_data_def execute_hash_def)
+  using length_input_data_cond[OF xs, of op_type to v ]
+  apply simp
   apply (triple_blocks_vcg)
     apply (sep_imp_solve2)
     apply (sep_imp_solve2)
@@ -2099,8 +2082,135 @@ assumes blk_num: "bn > 2463000"
   apply (sep_imp_solve2)
   apply (sep_imp_solve2)
   apply (sep_imp_solve2)
-  apply (sep_imp_solve2)
+            apply (sep_imp_solve2)
+  apply (drule ucast_sym)
+  using length_input_data_cond[OF xs, of op_type to v]
+           apply simp
+  apply (drule ucast_sym)
+  using length_input_data_cond[OF xs, of op_type to v]
+           apply simp
+  apply split_conds
+  apply split_conds
+          apply split_conds
+  apply (drule ucast_sym)
+  apply simp
   apply (triple_blocks_vcg)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (clarsimp?, order_sep_conj)
+              apply (((sep_cancel, clarsimp?)+)|simp add:|rule conjI)
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))+
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2 simp: word_rcat_simps)
+  apply (triple_blocks_vcg)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (clarsimp?, order_sep_conj)
+              apply (((sep_cancel, clarsimp?)+)|simp add:|rule conjI)
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x84"])?))+
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2 simp: word_rcat_simps)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply split_conds
+  apply split_conds
+  apply split_conds
+  apply (triple_blocks_vcg)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply split_conds
+  apply split_conds
+  apply split_conds
+  apply (triple_blocks_vcg)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+
+  apply split_conds
+  apply split_conds
+  apply (triple_blocks_vcg)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply split_conds
+  apply split_conds
+  apply (triple_blocks_vcg)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2 simp: word_rcat_simps)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
   apply (sep_imp_solve2)
   apply (sep_imp_solve2)
   apply (sep_imp_solve2)
@@ -2115,7 +2225,34 @@ assumes blk_num: "bn > 2463000"
   apply (sep_imp_solve2)
   apply (sep_imp_solve2)
   apply (sep_imp_solve2)
-  apply (subst stack_topmost_unfold_sep')
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (clarsimp?, order_sep_conj)
+              apply (((sep_cancel, clarsimp?)+)|simp add:|rule conjI)
+                      apply ((sep_cancel, (clarsimp simp: word_rcat_simps memory_def[ where ind="0x80"])?))+
+  apply (simp add: word_rcat_rsplit  bytestr_def)
+  oops
+  find_theorems word_rcat word_rsplit
+  thm word_rcat_rsplit[simplified bytestr_def[symmetric]] bytestr_def
+lemma
+"word_rcat
+            (take 32
+              (drop (unat ((4::w256) + word_rcat (bytestr ((of_nat (length xs))::w256))))
+                (input_data 0x44C028FE op_type to v xs))) = undefined"
+  apply (simp add: input_data_def execute_hash_def bytestr_def word_rcat_rsplit)
+  using [[show_types]]
+  oops
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+  apply (sep_imp_solve2)
+
+                      
+                      
+                      apply (subst stack_topmost_unfold_sep')
   apply (clarsimp?, order_sep_conj)
               apply (((sep_cancel, clarsimp?)+)|simp add:|rule conjI)
              apply ((sep_cancel, (clarsimp simp: word_rcat_simps ucast_to_input_data memory_def[ where ind="0x80"])?))
